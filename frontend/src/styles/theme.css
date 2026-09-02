@@ -1,0 +1,507 @@
+/* ===== 智能物流调度系统 全局设计系统规范 =====
+   现代工业级 B2B SaaS 风格 (精美无衬线体 + 统一品牌蓝 + 柔和灰阶 + 等宽数据排版) */
+
+:root {
+  /* 字体栈 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  /* 基础配色 */
+  --bg: #f8fafc;
+  --card-bg: #ffffff;
+  --card-bg-subtle: rgba(255, 255, 255, 0.9);
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  --border-strong: #cbd5e1;
+
+  /* 文字颜色 */
+  --text: #0f172a;
+  --text-regular: #334155;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+
+  /* 品牌主色系 (Sky / Ocean Blue) */
+  --primary: #0284c7;
+  --primary-hover: #0369a1;
+  --primary-active: #075985;
+  --primary-soft: #e0f2fe;
+  --primary-light: #f0f9ff;
+
+  /* 辅助状态色 */
+  --accent-success: #10b981;
+  --accent-success-soft: #ecfdf5;
+  --accent-warning: #f59e0b;
+  --accent-warning-soft: #fef3c7;
+  --accent-danger: #ef4444;
+  --accent-danger-soft: #fef2f2;
+  --accent-teal: #0d9488;
+  --accent-violet: #8b5cf6;
+
+  /* 渐变背景 */
+  --hero-gradient: linear-gradient(135deg, #0284c7 0%, #2563eb 50%, #4f46e5 100%);
+  --soft-gradient: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f8fafc 100%);
+
+  /* 阴影系统 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-float: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.06);
+
+  /* 圆角 */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+
+  /* 动画过渡 */
+  --transition-fast: all 0.15s ease;
+  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Element Plus 核心变量覆盖 */
+  --el-color-primary: #0284c7;
+  --el-color-primary-light-3: #38bdf8;
+  --el-color-primary-light-5: #7dd3fc;
+  --el-color-primary-light-7: #bae6fd;
+  --el-color-primary-light-8: #e0f2fe;
+  --el-color-primary-light-9: #f0f9ff;
+  --el-color-primary-dark-2: #0369a1;
+  --el-border-radius-base: 6px;
+  --el-border-radius-small: 4px;
+  --el-border-radius-round: 9999px;
+  --el-font-family: var(--font-sans);
+  --el-text-color-primary: #0f172a;
+  --el-text-color-regular: #334155;
+  --el-text-color-secondary: #64748b;
+  --el-text-color-placeholder: #94a3b8;
+  --el-border-color: #e2e8f0;
+  --el-border-color-light: #f1f5f9;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+}
+
+/* 统一无衬线标题 */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+/* 等宽数值与排版增强 */
+.font-mono,
+.tabular-nums {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+  transition: var(--transition-fast);
+}
+a:hover {
+  color: var(--primary-hover);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* ===== 共享卡片与容器样式 ===== */
+
+.lp-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 16px;
+  transition: var(--transition);
+}
+
+.lp-card:hover {
+  border-color: var(--border-strong);
+}
+
+.lp-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.lp-section-title::before {
+  content: '';
+  width: 3.5px;
+  height: 14px;
+  background: var(--primary);
+  border-radius: 2px;
+  display: inline-block;
+}
+
+/* ===== 按钮设计规范 ===== */
+
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--primary);
+  color: #ffffff;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.lp-btn:hover {
+  background: var(--primary-hover);
+  box-shadow: var(--shadow-sm);
+}
+
+.lp-btn:active {
+  background: var(--primary-active);
+}
+
+.lp-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.lp-btn--primary {
+  background: var(--primary);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.lp-btn--ghost {
+  background: #ffffff;
+  color: var(--text-regular);
+  border: 1px solid var(--border-strong);
+}
+
+.lp-btn--ghost:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.lp-btn--danger {
+  background: #ffffff;
+  color: var(--accent-danger);
+  border: 1px solid #fecaca;
+}
+
+.lp-btn--danger:hover {
+  background: var(--accent-danger-soft);
+  border-color: var(--accent-danger);
+}
+
+/* ===== 输入与表单控件规范 ===== */
+
+.lp-input,
+.lp-select {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+  background: #ffffff;
+  color: var(--text);
+  transition: var(--transition-fast);
+}
+
+.lp-input:focus,
+.lp-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-soft);
+}
+
+/* ===== 标签与标记 ===== */
+
+.lp-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--primary-soft);
+  color: var(--primary-dark-2);
+}
+
+/* ===== 全局滚动条美化 ===== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ===== Element Plus 全局组件微调 ===== */
+
+.el-button {
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+}
+
+.el-card {
+  border-radius: var(--radius);
+  border-color: var(--border);
+}
+
+.el-table {
+  font-size: 13px;
+  --el-table-header-bg-color: #f8fafc;
+  --el-table-header-text-color: #475569;
+  --el-table-row-hover-bg-color: #f0f9ff;
+  --el-table-border-color: #e2e8f0;
+}
+
+.el-table th.el-table__cell {
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.el-dialog {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.el-dialog__header {
+  margin-right: 0;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.el-dialog__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.el-dialog__footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: #f8fafc;
+}
+
+/* ===== 高级规划工具统一功能区规范 ===== */
+
+.data-source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+.empty-guide-card {
+  text-align: center;
+  padding: 14px 12px !important;
+  margin-bottom: 12px;
+  background: #f8fafc;
+  border: 1px dashed var(--border-strong);
+}
+
+.empty-guide-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.empty-guide-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.empty-guide-actions .lp-btn {
+  flex: 1;
+}
+
+.actions-container {
+  padding: 12px !important;
+  margin-bottom: 12px;
+}
+
+.main-solve-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.main-solve-btn {
+  flex: 1;
+  height: 38px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
+}
+
+.gear-btn {
+  padding: 0 12px !important;
+  font-size: 16px !important;
+  background: #f8fafc !important;
+}
+
+.gear-btn:hover {
+  background: var(--primary-light) !important;
+}
+
+.actions-toolbar-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.actions-toolbar-grid .lp-btn {
+  height: 32px;
+  font-size: 12px;
+  padding: 0 8px;
+}
+
+.is-box-selecting {
+  background-color: #f43f5e !important;
+  color: #ffffff !important;
+  border-color: #e11d48 !important;
+  font-weight: 600;
+  box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.2);
+}
+
+.actions-footer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px dashed var(--border);
+  gap: 8px;
+}
+
+.footer-sub-btn {
+  background: transparent;
+  border: none;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  transition: var(--transition-fast);
+}
+
+.footer-sub-btn:hover {
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+.footer-clear-btn:hover {
+  color: var(--accent-danger);
+  background: var(--accent-danger-soft);
+}
+
+/* 统一批量框选浮动卡片 */
+.batch-action-card {
+  margin-bottom: 12px;
+  border: 2px solid var(--accent-teal) !important;
+  background: #f0fdfa !important;
+  padding: 12px !important;
+  border-radius: var(--radius) !important;
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.12);
+}
+
+.batch-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.batch-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0d9488;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.batch-close-btn {
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px;
+}
+
+.batch-close-btn:hover {
+  color: #0f172a;
+}
+
+.batch-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+

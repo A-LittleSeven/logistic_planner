@@ -1,0 +1,162 @@
+"""
+物流路线规划求解器 (Google OR-Tools CVRP 约束优化求解)。
+"""
+from app.utils.distance import DistanceProvider
+from app.utils.registry import routing_registry
+from app.models.routing import RoutingSolveRequest
+
+
+def solve_or_tools_vrp(req: RoutingSolveRequest, provider: DistanceProvider) -> dict:
+    if not req.points:
+        raise ValueError("至少需要 1 个点")
+
+    depot_idx = 0
+    for i, p in enumerate(req.points):
+        if p.is_depot:
+            depot_idx = i
+            break
+
+    depot_point = req.points[depot_idx]
+    customers = [p for i, p in enumerate(req.points) if i != depot_idx]
+
+    if not customers:
+        return {
+            "algorithm": "ortools",
+            "routes": [],
+            "total_distance": 0.0,
+            "total_stores": 0,
+            "points": [p.model_dump() for p in req.points]
+        }
+
+    # Count of trucks and capacity
+    count_270 = 0
+    count_230 = 0
+    for t_prof in req.trucks:
+        if t_prof.capacity <= 100:
+            count_270 += t_prof.count
+        else:
+            count_230 += t_prof.count
+
+    if count_230 == 0 and count_270 == 0:
+        count_230 = len(customers)
+
+    # 智能补全数据库维护的 is_homepot
+    db_store_map = {}
+    missing_codes = [getattr(p, "shop_code", "") or p.name for p in customers if getattr(p, "is_homepot", None) is None]
+    if missing_codes:
+        try:
+            from app.core.database import SessionLocal
+            from app.db.models import DBStore
+            db = SessionLocal()
+            db_stores = db.query(DBStore).all()
+            for s in db_stores:
+                if s.shop_code:
+                    db_store_map[str(s.shop_code).strip()] = int(s.is_homepot if s.is_homepot is not None else 1)
+                if s.name:
+                    db_store_map[str(s.name).strip()] = int(s.is_homepot if s.is_homepot is not None else 1)
+            db.close()
+        except Exception:
+            pass
+
+    # Convert customers to stores dict list for route_local_replaning_with_or
+    stores_data = []
+    for idx, p in enumerate(customers):
+        p_name = (p.name or "").strip()
+        p_code = (getattr(p, "shop_code", "") or (p.model_extra.get("shop_code") if hasattr(p, "model_extra") and p.model_extra else "") or "").strip()
+
+        # Extract is_homepot safely from RoutePoint or model_extra
+        is_hp = getattr(p, "is_homepot", None)
+        if (is_hp is None or is_hp == "") and hasattr(p, "model_extra") and p.model_extra:
+            is_hp = p.model_extra.get("is_homepot")
+
+        # 未提供时优先从数据库匹配系统维护的值，若无匹配则默认本埠(1)
+        if is_hp is None or is_hp == "":
+            if p_code and p_code in db_store_map:
+                is_hp = db_store_map[p_code]
+            elif p_name and p_name in db_store_map:
+                is_hp = db_store_map[p_name]
+            else:
+                is_hp = 1
+
+        try:
+            is_hp = int(is_hp)
+        except (ValueError, TypeError):
+            is_hp = 1
+
+
+        stores_data.append({
+            "lon": float(p.lng),
+            "lat": float(p.lat),
+            "avg_loads": float(p.avg_loads or 10.0),
+            "shop_code": f"cust_{idx}",
+            "dept_id": f"cust_{idx}",
+            "name": p.name or f"store_{idx}",
+            "is_homepot": is_hp,
+            "warehouse_lon": float(depot_point.lng),
+            "warehouse_lat": float(depot_point.lat)
+        })
+
+    opts = req.options or {}
+    max_truck_capacity_rate = float(opts.get("max_capacity_rate", 1.0))
+    time_limit_seconds = int(opts.get("time_limit_seconds", opts.get("time_limit", 5)))
+    return_to_depot = bool(opts.get("return_to_depot", False))
+
+    # Pass the heterogeneous vehicle fleet (trucks)
+    trucks_data = [t.model_dump() if hasattr(t, "model_dump") else dict(t) for t in req.trucks]
+
+    from app.core.optimizer.route_local_replaning_with_or import plan_daily_routes_with_or
+    daily_routes = plan_daily_routes_with_or(
+        stores=stores_data,
+        trucks=trucks_data,
+        max_truck_capacity_rate=max_truck_capacity_rate,
+        warehouse_lon=depot_point.lng,
+        warehouse_lat=depot_point.lat,
+        time_limit_seconds=time_limit_seconds,
+        return_to_depot=return_to_depot,
+    )
+
+    routes_list = []
+    total_dist = 0.0
+    for r_idx, route in enumerate(daily_routes):
+        store_labels = route.get("path_store_ids", [])
+        order_indices = []
+        for label in store_labels:
+            if str(label).startswith("cust_"):
+                c_idx = int(str(label).split("_")[1])
+                order_indices.append(c_idx)
+            else:
+                for c_idx, p in enumerate(customers):
+                    if (p.name or f"store_{c_idx}") == label:
+                        order_indices.append(c_idx)
+                        break
+
+        # Wrap route with depot indicator (-1)
+        if return_to_depot:
+            order_indices = [-1] + order_indices + [-1]
+        else:
+            order_indices = [-1] + order_indices
+
+        truck_name = route.get("truck_name") or f"货车 ({route.get('vehicle_type', 230)}箱)"
+
+        routes_list.append({
+            "truck_name": truck_name,
+            "order": order_indices,
+            "distance": float(route.get("distance_km", 0.0)),
+            "load": float(route.get("load", 0.0)),
+            "is_homepot": int(route.get("is_homepot") if route.get("is_homepot") is not None else 1),
+            "return_to_depot": bool(return_to_depot),
+        })
+        total_dist += route.get("distance_km", 0.0)
+
+    return {
+        "algorithm": "ortools",
+        "routes": routes_list,
+        "total_distance": float(total_dist),
+        "total_stores": len(customers),
+        "return_to_depot": bool(return_to_depot),
+        "points": [p.model_dump() for p in req.points]
+    }
+
+
+routing_registry.register("ortools", solve_or_tools_vrp)
+routing_registry.register("savings_vrp", solve_or_tools_vrp)

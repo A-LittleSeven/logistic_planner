@@ -1,0 +1,55 @@
+# IDEs and Editors
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Frontend (Node.js/Vue)
+frontend/node_modules/
+frontend/dist/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/.DS_Store
+
+# Backend (Python)
+backend/__pycache__/
+backend/.venv/
+backend/venv/
+backend/env/
+backend/.env
+backend/logistic.db
+*.py[cod]
+*$py.class
+*.so
+backend/celerybeat-schedule
+backend/celerybeat.pid
+
+# Logs and databases
+*.log
+*.log.*
+backend/app/core/log/
+*.sqlite3
+
+# Electron
+node_modules/
+electron/renderer/
+dist-electron/
+dist/
+release/
+build/
+out/
