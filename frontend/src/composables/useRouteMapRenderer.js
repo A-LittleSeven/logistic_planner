@@ -243,14 +243,27 @@ export function useRouteMapRenderer() {
             title: `${p.name} (${r.day ? r.day + ' ' : ''}路线 ${(r.day_route_idx ?? rIdx) + 1} 第${seqIdx + 1}站)`,
           })
 
-          const otherRoutesOptions = routes
-            .map((or, oIdx) => {
+          // 过滤可选路线：严格仅支持当天路线调换
+          const currentRDay = r.day || (currentDay !== '全部' ? currentDay : '')
+          const sameDayRoutes = routes
+            .map((or, oIdx) => ({ or, oIdx }))
+            .filter(({ or }) => {
+              const targetRDay = or.day || (currentDay !== '全部' ? currentDay : '')
+              if (currentRDay && targetRDay) {
+                return currentRDay === targetRDay
+              }
+              return true
+            })
+
+          const otherRoutesOptions = sameDayRoutes
+            .map(({ or, oIdx }) => {
               const oTitle = or.day && or.day_route_idx !== undefined ? `${or.day} 路线 ${or.day_route_idx + 1}` : `路线 ${oIdx + 1}`
               return `<option value="${oIdx}" ${oIdx === rIdx ? 'disabled' : ''}>${oTitle} (${or.vehicle_name || or.truck_name || '货车'})</option>`
             })
             .join('')
 
           marker.on('click', () => {
+            const dayLabel = currentRDay ? ` (${currentRDay})` : ''
             const infoContent = `
               <div style="padding: 10px 14px; font-size: 12px; line-height: 1.5; color: #1e293b; min-width: 230px; background: white; border-radius: 8px;">
                 <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
@@ -267,12 +280,12 @@ export function useRouteMapRenderer() {
                   <span>路线里程: ${r.amap_distance || r.distance_km || r.distance || 0} km</span>
                 </div>
                 <div style="margin-top: 8px; border-top: 1px dashed #e2e8f0; padding-top: 6px;">
-                  <label style="font-size: 11px; font-weight: 600; color: #475569;">转移路线 / 配送方式:</label>
+                  <label style="font-size: 11px; font-weight: 600; color: #475569;">转移路线 / 配送方式${dayLabel}:</label>
                   <select onchange="window.updateStoreRoute(${rIdx}, ${seqIdx}, this.value)" style="margin-top: 4px; width: 100%; font-size: 11px; padding: 4px; border: 1px solid #0284c7; border-radius: 4px; background: #f0f9ff; color: #0369a1; font-weight: 600; cursor: pointer;">
-                    <option value="" disabled selected>选择目标路线 / 方式...</option>
+                    <option value="" disabled selected>选择同日目标路线 / 方式...</option>
                     ${otherRoutesOptions}
-                    <option value="new">+ 新建独立路线</option>
-                    <option value="express" style="color: #7c3aed; font-weight: 700;">📦 快递直发</option>
+                    <option value="new">+ 新建独立路线${dayLabel}</option>
+                    <option value="express" style="color: #7c3aed; font-weight: 700;">📦 移至快递直发 (不走货车)</option>
                   </select>
                 </div>
               </div>
