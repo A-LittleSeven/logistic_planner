@@ -256,6 +256,7 @@
             <div style="margin-top: 10px;">
               <RoutePlanList
                 :routes="currentDisplayRoutes"
+                :show-summary="false"
                 :all-routes="currentDisplayRoutes"
                 :express-stores="currentExpressStores"
                 :highlighted-route-idx="highlightedRouteIdx"
@@ -267,6 +268,7 @@
                 @calculate-amap="({ route, routeIdx }) => handleCalculateSingleAmapRoute({ route, routeIdx })"
                 @batch-calculate-amap="handleBatchCalculateAmap"
                 @move-store-order="({ routeIdx, storeIdx, direction }) => moveStoreOrder(routeIdx, storeIdx, direction)"
+                @reorder-store="({ routeIdx, fromIdx, toIdx }) => handleReorderStore(routeIdx, fromIdx, toIdx)"
                 @transfer-store="({ fromRouteIdx, storeIdx, targetRouteIdx }) => moveStoreBetweenRoutes(fromRouteIdx, storeIdx, targetRouteIdx)"
                 @restore-express-store="handleRestoreExpressStore"
                 @select-store="handleSelectStore"
@@ -1056,6 +1058,31 @@ const moveStoreOrder = (routeIdx, storeSeq, direction) => {
   renderRoute()
   saveToLocalStorage()
   ElMessage.success(`路线 ${routeIdx + 1} 站点次序已更新`)
+}
+
+const handleReorderStore = (routeIdx, fromIdx, toIdx) => {
+  const displayList = currentDisplayRoutes.value
+  const route = displayList[routeIdx]
+  if (!route) return
+  const sourceDay = route.day || selectedDay.value
+  const dayRes = dailyResults.value[sourceDay]
+  const dayRoutes = dayRes?.routes || result.value?.routes
+  if (!dayRoutes) return
+  const dayRoute = dayRoutes[route.day_route_idx ?? routeIdx]
+  if (!dayRoute || !dayRoute.points) return
+
+  const pts = dayRoute.points
+  if (fromIdx < 0 || fromIdx >= pts.length || toIdx < 0 || toIdx >= pts.length || fromIdx === toIdx) return
+
+  const [movedItem] = pts.splice(fromIdx, 1)
+  pts.splice(toIdx, 0, movedItem)
+  dayRoute.stops = pts
+  clearRouteMeasureCache(dayRoute)
+
+  recalculateRouteMetrics()
+  renderRoute()
+  saveToLocalStorage()
+  ElMessage.success(`已将「${movedItem.name || '门店'}」拖拽调整至第 ${toIdx + 1} 站`)
 }
 
 const handleRestoreExpressStore = (store) => {

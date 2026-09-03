@@ -137,6 +137,7 @@
         @calculate-amap="({ route, routeIdx }) => calculateSingleAmapRoute(route, routeIdx)"
         @batch-calculate-amap="batchMeasureAMapRoutes"
         @move-store-order="({ routeIdx, storeIdx, direction }) => handleMoveStoreOrder(routeIdx, storeIdx, direction)"
+        @reorder-store="({ routeIdx, fromIdx, toIdx }) => handleReorderStore(routeIdx, fromIdx, toIdx)"
         @transfer-store="({ fromRouteIdx, storeIdx, targetRouteIdx }) => handleMoveStoreBetweenRoutes(fromRouteIdx, storeIdx, targetRouteIdx)"
         @restore-express-store="(s) => handleRestoreExpressStore(s, () => $emit('render-map'))"
         @select-store="(s) => $emit('select-store', s)"
@@ -428,6 +429,29 @@ const handleMoveStoreOrder = (rIdx, storeSeq, direction) => {
   dayRoute.points[storeSeq] = dayRoute.points[newIndex]
   dayRoute.points[newIndex] = temp
   dayRoute.stops = dayRoute.points
+  clearRouteMeasureCache(dayRoute)
+
+  recalculateRouteMetrics()
+  emit('render-map')
+}
+
+const handleReorderStore = (rIdx, fromIdx, toIdx) => {
+  const displayList = currentDisplayRoutes.value
+  const r = displayList[rIdx]
+  if (!r) return
+  const sourceDay = r.day || (selectedRoutingDay.value !== '全部' ? selectedRoutingDay.value : '周一')
+  const dayRes = dailyResults.value[sourceDay]
+  const dayRoutes = dayRes?.routes || routes.value
+  if (!dayRoutes) return
+  const dayRoute = dayRoutes[r.day_route_idx ?? rIdx]
+  if (!dayRoute || !dayRoute.points) return
+
+  const list = dayRoute.points
+  if (fromIdx < 0 || fromIdx >= list.length || toIdx < 0 || toIdx >= list.length || fromIdx === toIdx) return
+
+  const [movedItem] = list.splice(fromIdx, 1)
+  list.splice(toIdx, 0, movedItem)
+  dayRoute.stops = list
   clearRouteMeasureCache(dayRoute)
 
   recalculateRouteMetrics()

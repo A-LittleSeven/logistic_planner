@@ -22,6 +22,34 @@
       </el-button>
     </div>
 
+    <!-- Summary Stats Grid (总行驶里程、配送门店数、启用车辆数、平均装载) -->
+    <div v-if="showSummary && routes.length" class="summary-stats-grid">
+      <div class="stat-box">
+        <span class="stat-label">总行驶里程</span>
+        <span class="stat-val" style="color: #0284c7;">
+          {{ totalDistanceKm }} <small>km</small>
+        </span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-label">配送门店数</span>
+        <span class="stat-val" style="color: #10b981;">
+          {{ totalStoresCount }} <small>家</small>
+        </span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-label">启用车辆数</span>
+        <span class="stat-val" style="color: #6366f1;">
+          {{ totalVehiclesCount }} <small>辆</small>
+        </span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-label">平均车装载</span>
+        <span class="stat-val" style="color: #f59e0b;">
+          {{ avgTruckLoad }} <small>箱/车</small>
+        </span>
+      </div>
+    </div>
+
     <!-- Batch Measuring Progress Banner -->
     <div v-if="batchMeasuring" class="batch-measure-progress-banner">
       <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; color: #166534; font-weight: 600;">
@@ -120,52 +148,50 @@
           </button>
         </div>
 
-        <!-- Expanded Store Sequence & Transfer Actions -->
+        <!-- Expanded Store Sequence: Single-line draggable list -->
         <div v-if="expandedRouteIndices.has(idx)" class="route-stores-list" @click.stop>
           <div
             v-for="(p, sIdx) in (r.points || r.stops || [])"
-            :key="sIdx"
-            class="route-store-row"
+            :key="p.id || p.shop_code || sIdx"
+            class="route-store-row-draggable"
+            :class="{
+              'is-dragging': draggedRouteIdx === idx && draggedStoreIdx === sIdx,
+              'is-drag-over': draggedRouteIdx === idx && dragOverStoreIdx === sIdx && draggedStoreIdx !== sIdx
+            }"
+            draggable="true"
+            @dragstart="handleDragStart(idx, sIdx, $event)"
+            @dragover.prevent="handleDragOver(idx, sIdx, $event)"
+            @dragleave="handleDragLeave(idx, sIdx, $event)"
+            @drop="handleDrop(idx, sIdx, $event)"
+            @click="$emit('select-store', p)"
           >
-            <div class="store-seq-info">
-              <span class="seq-badge" :style="{ background: getColor(idx) }">{{ sIdx + 1 }}</span>
-              <span class="store-name-text" :title="p.name">{{ p.name || `门店${sIdx + 1}` }}</span>
-              <span class="store-demand-text">({{ p.avg_loads || p.demand || 10 }}箱)</span>
-            </div>
+            <!-- 拖拽把手图标 -->
+            <span class="drag-handle" title="按住拖拽调整当前车次到店次序">⋮⋮</span>
 
-            <div style="display: flex; align-items: center; gap: 4px;">
-              <!-- Up / Down Order Buttons -->
-              <button
-                class="order-btn"
-                :disabled="sIdx === 0"
-                title="上移此站点顺序"
-                @click.stop="$emit('move-store-order', { routeIdx: idx, storeIdx: sIdx, direction: -1 })"
-              >
-                ▲
-              </button>
-              <button
-                class="order-btn"
-                :disabled="sIdx === (r.points || r.stops || []).length - 1"
-                title="下移此站点顺序"
-                @click.stop="$emit('move-store-order', { routeIdx: idx, storeIdx: sIdx, direction: 1 })"
-              >
-                ▼
-              </button>
+            <!-- 到店次序序号 -->
+            <span class="seq-badge" :style="{ background: getColor(idx) }">{{ sIdx + 1 }}</span>
 
-              <!-- Direct Transfer Dropdown (Including Express Option) -->
+            <!-- 只展示门店名称，占据整行剩余空间 -->
+            <span class="store-name-text" :title="p.name || `门店${sIdx + 1}`">
+              {{ p.name || `门店${sIdx + 1}` }}
+            </span>
+
+            <!-- 缩小尺寸的紧凑调换路线下拉框（只支持当天路线调换） -->
+            <div class="store-transfer-wrap" @click.stop>
               <select
-                class="transfer-select"
+                class="transfer-select-compact"
+                title="调换路线（仅限当天路线）"
                 @click.stop
                 @change="handleTransferSelect(idx, sIdx, $event)"
               >
-                <option value="" disabled selected>调换路线</option>
+                <option value="" disabled selected>⇄ 调线</option>
                 <option
-                  v-for="(otherRoute, oIdx) in (allRoutes || routes)"
-                  :key="oIdx"
-                  :value="oIdx"
-                  :disabled="oIdx === idx"
+                  v-for="item in getAvailableTransferRoutes(r, idx)"
+                  :key="item.oIdx"
+                  :value="item.oIdx"
+                  :disabled="item.oIdx === idx"
                 >
-                  路线 {{ oIdx + 1 }} ({{ otherRoute.vehicle_name || otherRoute.truck_name || '货车' }}, 已载{{ Math.round(otherRoute.load ?? otherRoute.total_weight ?? 0) }}箱)
+                  {{ getRouteTitle(item.route, item.oIdx) }} ({{ item.route.vehicle_name || item.route.truck_name || '货车' }}, 已载{{ Math.round(item.route.load ?? item.route.total_weight ?? 0) }}箱)
                 </option>
                 <option value="new">+ 移至新路线</option>
                 <option value="express" style="color: #7c3aed; font-weight: 700;">📦 移至快递直发 (不走货车)</option>
@@ -260,6 +286,10 @@ const props = defineProps({
     type: Function,
     default: null,
   },
+  showSummary: {
+    type: Boolean,
+    default: true,
+  },
 })
 
 const emit = defineEmits([
@@ -267,6 +297,7 @@ const emit = defineEmits([
   'calculate-amap',
   'batch-calculate-amap',
   'move-store-order',
+  'reorder-store',
   'transfer-store',
   'restore-express-store',
   'select-store',
@@ -274,6 +305,65 @@ const emit = defineEmits([
 
 const expandedRouteIndices = ref(new Set())
 const expressExpanded = ref(true)
+
+// Drag & drop state for store sequence reordering
+const draggedRouteIdx = ref(null)
+const draggedStoreIdx = ref(null)
+const dragOverStoreIdx = ref(null)
+
+const handleDragStart = (rIdx, sIdx, event) => {
+  draggedRouteIdx.value = rIdx
+  draggedStoreIdx.value = sIdx
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData('text/plain', String(sIdx))
+}
+
+const handleDragOver = (rIdx, sIdx, event) => {
+  if (draggedRouteIdx.value !== rIdx) return
+  event.preventDefault()
+  event.dataTransfer.dropEffect = 'move'
+  dragOverStoreIdx.value = sIdx
+}
+
+const handleDragLeave = (rIdx, sIdx) => {
+  if (dragOverStoreIdx.value === sIdx) {
+    dragOverStoreIdx.value = null
+  }
+}
+
+const handleDrop = (rIdx, toIdx, event) => {
+  event.preventDefault()
+  if (draggedRouteIdx.value === null || draggedStoreIdx.value === null) return
+  if (draggedRouteIdx.value !== rIdx) {
+    draggedRouteIdx.value = null
+    draggedStoreIdx.value = null
+    dragOverStoreIdx.value = null
+    return
+  }
+
+  const fromIdx = draggedStoreIdx.value
+  draggedRouteIdx.value = null
+  draggedStoreIdx.value = null
+  dragOverStoreIdx.value = null
+
+  if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0) return
+
+  emit('reorder-store', { routeIdx: rIdx, fromIdx, toIdx })
+}
+
+// 路线调换过滤：只支持当天的路线调换
+const getAvailableTransferRoutes = (currentRoute, currentIdx) => {
+  const allList = props.allRoutes || props.routes
+  return allList
+    .map((route, oIdx) => ({ route, oIdx }))
+    .filter(({ route }) => {
+      // 若当前路线有指定作业日，仅支持调换至相同作业日的其他路线
+      if (currentRoute.day && route.day) {
+        return currentRoute.day === route.day
+      }
+      return true
+    })
+}
 
 const toggleExpandRoute = (idx) => {
   if (expandedRouteIndices.value.has(idx)) {
@@ -307,6 +397,24 @@ const totalDistanceKm = computed(() => {
     return acc + (Number(r.distance ?? r.distance_km) || 0)
   }, 0)
   return sum.toFixed(1)
+})
+
+const totalStoresCount = computed(() => {
+  return props.routes.reduce((acc, r) => {
+    return acc + (r.points || r.stops || []).length
+  }, 0)
+})
+
+const totalVehiclesCount = computed(() => {
+  return props.routes.length
+})
+
+const avgTruckLoad = computed(() => {
+  if (!props.routes.length) return 0
+  const totalLoad = props.routes.reduce((acc, r) => {
+    return acc + (Number(r.load ?? r.total_weight ?? r.avg_loads) || 0)
+  }, 0)
+  return Math.round(totalLoad / props.routes.length)
 })
 
 const totalExpressLoads = computed(() => {
@@ -470,31 +578,101 @@ const handleTransferSelect = (routeIdx, storeIdx, event) => {
   background: #f0f9ff;
 }
 
+/* Summary Stats Grid */
+.summary-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.stat-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.stat-val {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.stat-val small {
+  font-size: 11px;
+  font-weight: normal;
+  color: #64748b;
+  margin-left: 2px;
+}
+
 .route-stores-list {
   margin-top: 8px;
   padding-top: 6px;
   border-top: 1px dashed #e2e8f0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
-.route-store-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 3px 4px;
-  background: #f8fafc;
-  border-radius: 4px;
-  font-size: 11px;
-}
-
-.store-seq-info {
+.route-store-row-draggable {
   display: flex;
   align-items: center;
   gap: 6px;
-  overflow: hidden;
-  max-width: 170px;
+  padding: 4px 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  cursor: pointer;
+  user-select: none;
+  min-height: 28px;
+  box-sizing: border-box;
+}
+
+.route-store-row-draggable:hover {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+
+.route-store-row-draggable.is-dragging {
+  opacity: 0.35;
+  background: #f1f5f9;
+  border: 1px dashed #0284c7;
+}
+
+.route-store-row-draggable.is-drag-over {
+  border-top: 2px solid #0284c7;
+  background: #f0f9ff;
+  transform: translateY(1px);
+}
+
+.drag-handle {
+  color: #94a3b8;
+  cursor: grab;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 2px;
+  letter-spacing: -1px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.drag-handle:hover {
+  color: #334155;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .seq-badge {
@@ -513,51 +691,39 @@ const handleTransferSelect = (routeIdx, storeIdx, event) => {
 .store-name-text {
   color: #1e293b;
   font-weight: 500;
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
-.store-demand-text {
-  color: #94a3b8;
-  font-size: 10px;
+.store-transfer-wrap {
   flex-shrink: 0;
-}
-
-.order-btn {
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #475569;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 8px;
 }
 
-.order-btn:hover:not(:disabled) {
-  background: #f1f5f9;
-  border-color: #94a3b8;
-}
-
-.order-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.transfer-select {
+.transfer-select-compact {
   font-size: 10px;
-  padding: 1px 4px;
+  height: 20px;
+  line-height: 18px;
+  padding: 0 4px;
   border: 1px solid #cbd5e1;
   border-radius: 3px;
   background: #ffffff;
   color: #0284c7;
   font-weight: 600;
   cursor: pointer;
+  max-width: 68px;
+  outline: none;
+  transition: all 0.15s;
+}
+
+.transfer-select-compact:hover {
+  border-color: #0284c7;
+  background: #f0f9ff;
 }
 
 /* Express Section */
