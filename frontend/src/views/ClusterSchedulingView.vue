@@ -332,19 +332,71 @@ const isSelecting = ref(false)
 let mouseTool = null
 
 let storeMarkers = []
-let storeInfoWindows = []
+let singleInfoWindow = null
+let labelsLayer = null
+
+function getStoreBubbleContent(p, idx) {
+  const storeFreq = Math.round(Number(p.frequency || (p.delivery_days_str ? p.delivery_days_str.split(',').filter(Boolean).length : 1)))
+  const validOpts = getValidScheduleOptionsForFreq(storeFreq)
+  let optionsHtml = validOpts.map(opt => `<option value="${opt.value}" ${p.delivery_days_str === opt.value ? 'selected' : ''}>${opt.label}</option>`).join('')
+  if (p.delivery_days_str && !validOpts.some(opt => opt.value === p.delivery_days_str)) {
+    optionsHtml = `<option value="${p.delivery_days_str}" selected disabled>⚠️ 当前非标准作业日: ${p.delivery_days_str} (请选择合规模式)</option>` + optionsHtml
+  }
+
+  const isHp = Number(p.is_homepot !== undefined && p.is_homepot !== null ? p.is_homepot : 0)
+  return `
+    <div style="padding: 12px; font-size: 12px; line-height: 1.5; color: #1e293b; min-width: 260px; background: #fff; border-radius: 8px;">
+      <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; display: flex; justify-content: space-between;">
+        <span>${p.name || '未命名门店'}</span>
+        <span style="font-size: 11px; color: #94a3b8;">#${idx + 1}</span>
+      </div>
+      <div style="margin-bottom: 5px; color: #64748b;">
+        所属店群: <strong style="color: #0284c7;">店群 ${(p.cluster_id !== undefined ? p.cluster_id : 0) + 1}</strong>
+      </div>
+      <div style="margin-bottom: 5px; color: #64748b;">
+        日均货量: <strong>${p.avg_loads || 0.0}</strong> 箱 | 配送频次: <strong style="color: #0284c7;">每周 ${storeFreq} 次</strong>
+      </div>
+      <div style="margin-bottom: 5px; color: #64748b; display: flex; align-items: center; justify-content: space-between;">
+        <span>门店属性:</span>
+        <select onchange="window.updateStoreHomepot(${idx}, this.value)" style="font-size: 11px; padding: 2px 6px; border: 1px solid #cbd5e1; border-radius: 4px; background: #f8fafc; font-weight: 600;">
+          <option value="1" ${isHp === 1 ? 'selected' : ''}>🏠 本埠门店</option>
+          <option value="0" ${isHp === 0 ? 'selected' : ''}>🚗 外埠门店</option>
+        </select>
+      </div>
+      <div style="margin-top: 8px;">
+        <div style="font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">
+          调整配送作业日 (限定 ${storeFreq}次/周 规则):
+        </div>
+        <select onchange="window.updateScheduleDays(${idx}, this.value)" style="width: 100%; font-size: 11px; padding: 5px; border: 1px solid #0284c7; border-radius: 4px; background: #f0f9ff; color: #0369a1; font-weight: 600;">
+          ${optionsHtml}
+        </select>
+      </div>
+    </div>
+  `
+}
+
+function openStoreInfoWindow(p, idx, pos) {
+  const mapObj = mapPanel.value?.getMap()
+  const A = amap.value
+  if (!mapObj || !A) return
+  if (!singleInfoWindow) {
+    singleInfoWindow = new A.InfoWindow({
+      offset: new A.Pixel(0, -18),
+      closeWhenClickMap: true
+    })
+  }
+  singleInfoWindow.setContent(getStoreBubbleContent(p, idx))
+  singleInfoWindow.open(mapObj, pos || [Number(p.lng), Number(p.lat)])
+}
 
 const handleSelectStore = (item) => {
   if (!item || item.index === undefined) return
   const mapObj = mapPanel.value?.getMap()
-  const marker = storeMarkers[item.index]
-  const infoWindow = storeInfoWindows[item.index]
-  if (mapObj && marker && infoWindow) {
-    mapObj.setZoomAndCenter(15, marker.getPosition())
-    infoWindow.open(mapObj, marker.getPosition())
-  } else if (mapObj && item.lng && item.lat) {
-    mapObj.setZoomAndCenter(15, [Number(item.lng), Number(item.lat)])
-  }
+  const p = points.value[item.index]
+  if (!p || !mapObj) return
+  const pos = [Number(p.lng), Number(p.lat)]
+  mapObj.setZoomAndCenter(15, pos)
+  openStoreInfoWindow(p, item.index, pos)
 }
 
 // Save & History Modal States
@@ -717,14 +769,62 @@ window.updateStoreHomepot = function(idx, val) {
   }
 }
 
+// 缓存纯色圆形图标 Base64 数据 URI，避免重复生成
+const iconCache = new Map()
+function getCircleIcon(color, size = 20, isSelected = false, opacity = 1.0) {
+  const cacheKey = `${color}_${size}_${isSelected}_${opacity}`
+  if (iconCache.has(cacheKey)) {
+    return iconCache.get(cacheKey)
+  }
+  const canvas = document.createElement('canvas')
+  const scale = 2
+  canvas.width = size * scale
+  canvas.height = size * scale
+  const ctx = canvas.getContext('2d')
+  ctx.scale(scale, scale)
+
+  ctx.globalAlpha = opacity
+
+  // 绘制外发光/边框 (若被选中)
+  if (isSelected) {
+    ctx.beginPath()
+    ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2)
+    ctx.strokeStyle = '#0d9488'
+    ctx.lineWidth = 3
+    ctx.stroke()
+  }
+
+  // 绘制实心圆
+  ctx.beginPath()
+  ctx.arc(size / 2, size / 2, size / 2 - (isSelected ? 4 : 2), 0, Math.PI * 2)
+  ctx.fillStyle = color
+  ctx.fill()
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+
+  const dataUri = canvas.toDataURL()
+  iconCache.set(cacheKey, dataUri)
+  return dataUri
+}
+
 function renderPoints() {
   if (!amap.value || !mapPanel.value) return
   const A = amap.value
+  const mapObj = mapPanel.value?.getMap()
+  if (!mapObj) return
+
   mapPanel.value.clearAll()
   storeMarkers = []
-  storeInfoWindows = []
+  if (labelsLayer) {
+    try {
+      labelsLayer.clear()
+      mapObj.remove(labelsLayer)
+    } catch (e) {}
+    labelsLayer = null
+  }
 
-  // Draw Depot
+  // 1. Draw Depot (单个 Marker)
   if (depotLng.value && depotLat.value) {
     const { content, offset } = dotHtml({ text: '仓', color: '#475569', size: 28 })
     mapPanel.value.addOverlay(
@@ -737,10 +837,19 @@ function renderPoints() {
     )
   }
 
-  // Draw Stores
+  // 2. High-Performance Canvas LabelsLayer for Stores
+  labelsLayer = new A.LabelsLayer({
+    zooms: [3, 20],
+    zIndex: 1000,
+    collision: false,
+    allowCollision: true
+  })
+
+  const labelMarkers = []
+
   points.value.forEach((p, idx) => {
     if (p.lng === '' || p.lat === '') return
-    
+
     let opacity = 1.0
     if (selectedDay.value !== '全部') {
       const match = p.delivery_days_str && p.delivery_days_str.includes(selectedDay.value)
@@ -749,108 +858,57 @@ function renderPoints() {
       }
     }
 
+    const isSelected = selectedPointIndices.value.includes(idx)
     const color = getPointColor(p, idx)
-    const { content, offset } = dotHtml({
-      text: String(idx + 1),
-      color,
-      size: selectedPointIndices.value.includes(idx) ? 26 : 22,
-    })
+    const size = isSelected ? 24 : 18
 
     const storeFreq = Math.round(Number(p.frequency || (p.delivery_days_str ? p.delivery_days_str.split(',').filter(Boolean).length : 1)))
     p.frequency = storeFreq
 
-    let badgeHtml = ''
-    if (storeFreq > 1) {
-      badgeHtml = `<span style="
-        position: absolute;
-        top: -6px;
-        right: -6px;
-        background: #ef4444;
-        color: white;
-        font-size: 9px;
-        font-weight: 800;
-        border-radius: 50%;
-        width: 14px;
-        height: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 0 4px rgba(0,0,0,0.3);
-        border: 1px solid white;
-        z-index: 10;
-        pointer-events: none;
-      ">${storeFreq}</span>`
-    }
+    const iconUri = getCircleIcon(color, size, isSelected, opacity)
 
-    let finalContent = `<div style="position: relative;">${content}${badgeHtml}</div>`
-    if (opacity < 1.0) {
-      finalContent = `<div style="opacity: ${opacity}; transition: opacity 0.25s; position: relative;">${content}${badgeHtml}</div>`
-    } else if (selectedPointIndices.value.includes(idx)) {
-      finalContent = `<div style="box-shadow: 0 0 12px #0d9488; border-radius: 50%; outline: 3px solid #0d9488; outline-offset: 2px; position: relative;">${content}${badgeHtml}</div>`
-    }
-
-    const marker = new A.Marker({
+    // 配置 LabelMarker 标注
+    const markerConfig = {
       position: [Number(p.lng), Number(p.lat)],
-      content: finalContent,
-      offset: new A.Pixel(offset[0], offset[1])
-    })
-
-    // 根据门店本身的频次属性动态过滤合规选项
-    const validOpts = getValidScheduleOptionsForFreq(storeFreq)
-    let optionsHtml = validOpts.map(opt => `<option value="${opt.value}" ${p.delivery_days_str === opt.value ? 'selected' : ''}>${opt.label}</option>`).join('')
-    if (p.delivery_days_str && !validOpts.some(opt => opt.value === p.delivery_days_str)) {
-      optionsHtml = `<option value="${p.delivery_days_str}" selected disabled>⚠️ 当前非标准作业日: ${p.delivery_days_str} (请选择合规模式)</option>` + optionsHtml
+      opacity,
+      rank: isSelected ? 2 : 1,
+      icon: {
+        type: 'image',
+        image: iconUri,
+        size: [size, size],
+        anchor: 'center'
+      },
+      text: {
+        content: String(idx + 1),
+        direction: 'center',
+        offset: [0, 0],
+        style: {
+          fontSize: size <= 18 ? 9 : 11,
+          fontWeight: 'bold',
+          fillColor: '#ffffff',
+          strokeColor: color,
+          strokeWidth: 0.5
+        }
+      },
+      extData: {
+        point: p,
+        index: idx
+      }
     }
 
-    const isHp = Number(p.is_homepot !== undefined && p.is_homepot !== null ? p.is_homepot : 0)
-    const bubbleContent = `
-      <div style="padding: 12px; font-size: 12px; line-height: 1.5; color: #1e293b; min-width: 260px; background: #fff; border-radius: 8px;">
-        <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; display: flex; justify-content: space-between;">
-          <span>${p.name || '未命名门店'}</span>
-          <span style="font-size: 11px; color: #94a3b8;">#${idx + 1}</span>
-        </div>
-        <div style="margin-bottom: 5px; color: #64748b;">
-          所属店群: <strong style="color: #0284c7;">店群 ${(p.cluster_id !== undefined ? p.cluster_id : 0) + 1}</strong>
-        </div>
-        <div style="margin-bottom: 5px; color: #64748b;">
-          日均货量: <strong>${p.avg_loads || 0.0}</strong> 箱 | 配送频次: <strong style="color: #0284c7;">每周 ${storeFreq} 次</strong>
-        </div>
-        <div style="margin-bottom: 5px; color: #64748b; display: flex; align-items: center; justify-content: space-between;">
-          <span>门店属性:</span>
-          <select onchange="window.updateStoreHomepot(${idx}, this.value)" style="font-size: 11px; padding: 2px 6px; border: 1px solid #cbd5e1; border-radius: 4px; background: #f8fafc; font-weight: 600;">
-            <option value="1" ${isHp === 1 ? 'selected' : ''}>🏠 本埠门店</option>
-            <option value="0" ${isHp === 0 ? 'selected' : ''}>🚗 外埠门店</option>
-          </select>
-        </div>
-        <div style="margin-top: 8px;">
-          <div style="font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">
-            调整配送作业日 (限定 ${storeFreq}次/周 规则):
-          </div>
-          <select onchange="window.updateScheduleDays(${idx}, this.value)" style="width: 100%; font-size: 11px; padding: 5px; border: 1px solid #0284c7; border-radius: 4px; background: #f0f9ff; color: #0369a1; font-weight: 600;">
-            ${optionsHtml}
-          </select>
-        </div>
-      </div>
-    `
+    const labelMarker = new A.LabelMarker(markerConfig)
 
-    const infoWindow = new A.InfoWindow({
-      content: bubbleContent,
-      offset: new A.Pixel(0, -18),
-      closeWhenClickMap: true
+    labelMarker.on('click', () => {
+      openStoreInfoWindow(p, idx, [Number(p.lng), Number(p.lat)])
     })
 
-    marker.on('click', () => {
-      const mapObj = mapPanel.value?.getMap()
-      if (mapObj) {
-        infoWindow.open(mapObj, marker.getPosition())
-      }
-    })
-
-    storeMarkers[idx] = marker
-    storeInfoWindows[idx] = infoWindow
-
-    mapPanel.value.addOverlay(marker)
+    labelMarkers.push(labelMarker)
+    storeMarkers[idx] = labelMarker
   })
+
+  labelsLayer.add(labelMarkers)
+  mapObj.add(labelsLayer)
+  mapPanel.value.addOverlay(labelsLayer)
 }
 
 function initMouseTool() {
@@ -1273,6 +1331,18 @@ onBeforeUnmount(() => {
   delete window.updateStoreHomepot
   if (mouseTool) {
     mouseTool.close(true)
+  }
+  if (labelsLayer) {
+    try {
+      labelsLayer.clear()
+    } catch (e) {}
+    labelsLayer = null
+  }
+  if (singleInfoWindow) {
+    try {
+      singleInfoWindow.close()
+    } catch (e) {}
+    singleInfoWindow = null
   }
 })
 </script>

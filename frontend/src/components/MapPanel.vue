@@ -72,7 +72,14 @@ function addOverlay(o) {
 }
 
 function clearAll() {
-  if (map && overlays.length) map.remove(overlays)
+  if (map && overlays.length) {
+    overlays.forEach((o) => {
+      try {
+        if (o.clear) o.clear()
+        map.remove(o)
+      } catch (e) {}
+    })
+  }
   overlays.length = 0
 }
 
