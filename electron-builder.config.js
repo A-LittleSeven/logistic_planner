@@ -5,7 +5,7 @@
 module.exports = {
   appId: 'com.logistic-planner.app',
   productName: '物流规划调度系统',
-  copyright: 'Copyright © 2024',
+  copyright: 'Copyright © 2026',
 
   directories: {
     output: 'dist-electron',
