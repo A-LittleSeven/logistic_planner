@@ -83,7 +83,7 @@ def euclidean_distance(lon1, lat1, lon2, lat2):
     return sqrt(dlat_km ** 2 + dlon_km ** 2)
 
 
-def baidu_driving_distance(lon1, lat1, lon2, lat2, ak='tZGvPEHjUVaR9S7q0kISWPFUeD9ehwB4', timeout=3):
+def baidu_driving_distance(lon1, lat1, lon2, lat2, ak='', timeout=3):
     """
     调用百度地图驾车路线规划 API 计算两个点之间的驾车距离 (km)。
 
@@ -97,11 +97,13 @@ def baidu_driving_distance(lon1, lat1, lon2, lat2, ak='tZGvPEHjUVaR9S7q0kISWPFUe
     :param lat1: 纬度1
     :param lon2: 经度2
     :param lat2: 纬度2
-    :param ak: 百度地图 AK。为 None 时读取环境变量 BAIDU_MAP_AK。
+    :param ak: 百度地图 AK。为空时读取环境变量 BAIDU_MAP_AK。
     :param coord_type: 坐标类型，可选 bd09ll / gcj02ll / wgs84ll。
     :param timeout: 请求超时秒数。
     :return: 驾车距离 (km)
     """
+    if not ak:
+        ak = os.environ.get('BAIDU_MAP_AK', '')
     if not ak:
         raise ValueError("缺少百度地图 AK，请传入 ak 参数或设置环境变量 BAIDU_MAP_AK")
 

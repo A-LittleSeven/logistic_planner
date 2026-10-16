@@ -304,7 +304,7 @@ import MapPanel from '../components/MapPanel.vue'
 import MapStoreSearch from '../components/MapStoreSearch.vue'
 import ScheduleBalanceCard from '../components/planning/ScheduleBalanceCard.vue'
 import { clusteringApi } from '../api/client.js'
-import { dotHtml } from '../utils/mapMarkers.js'
+import { dotHtml, DAY_COLORS, escapeHtml } from '../utils/mapMarkers.js'
 import { parseFileUniversal } from '../utils/excelImport.js'
 import * as XLSX from 'xlsx'
 import { ElMessage } from 'element-plus'
@@ -343,11 +343,12 @@ function getStoreBubbleContent(p, idx) {
     optionsHtml = `<option value="${p.delivery_days_str}" selected disabled>⚠️ 当前非标准作业日: ${p.delivery_days_str} (请选择合规模式)</option>` + optionsHtml
   }
 
+  const safeName = escapeHtml(p.name || '未命名门店')
   const isHp = Number(p.is_homepot !== undefined && p.is_homepot !== null ? p.is_homepot : 0)
   return `
     <div style="padding: 12px; font-size: 12px; line-height: 1.5; color: #1e293b; min-width: 260px; background: #fff; border-radius: 8px;">
       <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; display: flex; justify-content: space-between;">
-        <span>${p.name || '未命名门店'}</span>
+        <span>${safeName}</span>
         <span style="font-size: 11px; color: #94a3b8;">#${idx + 1}</span>
       </div>
       <div style="margin-bottom: 5px; color: #64748b;">
@@ -358,7 +359,7 @@ function getStoreBubbleContent(p, idx) {
       </div>
       <div style="margin-bottom: 5px; color: #64748b; display: flex; align-items: center; justify-content: space-between;">
         <span>门店属性:</span>
-        <select onchange="window.updateStoreHomepot(${idx}, this.value)" style="font-size: 11px; padding: 2px 6px; border: 1px solid #cbd5e1; border-radius: 4px; background: #f8fafc; font-weight: 600;">
+        <select onchange="window.updateScheduleStoreHomepot(${idx}, this.value)" style="font-size: 11px; padding: 2px 6px; border: 1px solid #cbd5e1; border-radius: 4px; background: #f8fafc; font-weight: 600;">
           <option value="1" ${isHp === 1 ? 'selected' : ''}>🏠 本埠门店</option>
           <option value="0" ${isHp === 0 ? 'selected' : ''}>🚗 外埠门店</option>
         </select>
@@ -367,7 +368,7 @@ function getStoreBubbleContent(p, idx) {
         <div style="font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">
           调整配送作业日 (限定 ${storeFreq}次/周 规则):
         </div>
-        <select onchange="window.updateScheduleDays(${idx}, this.value)" style="width: 100%; font-size: 11px; padding: 5px; border: 1px solid #0284c7; border-radius: 4px; background: #f0f9ff; color: #0369a1; font-weight: 600;">
+        <select onchange="window.updateScheduleStoreDays(${idx}, this.value)" style="width: 100%; font-size: 11px; padding: 5px; border: 1px solid #0284c7; border-radius: 4px; background: #f0f9ff; color: #0369a1; font-weight: 600;">
           ${optionsHtml}
         </select>
       </div>
@@ -606,16 +607,6 @@ const saveScheduleOptions = () => {
   ElMessage.success('TruckSchedule 运力排班参数已更新并保存！')
 }
 
-const DAY_COLORS = {
-  '周一': '#3b82f6', // bright blue
-  '周二': '#10b981', // emerald green
-  '周三': '#ef4444', // vibrant red
-  '周四': '#f59e0b', // amber orange
-  '周五': '#8b5cf6', // violet purple
-  '周六': '#ec4899', // hot pink
-  '周日': '#06b6d4'  // dark cyan
-}
-
 // 严格间隔约束的排班作业日枚举
 const SCHEDULE_DAY_GROUPS = [
   {
@@ -750,8 +741,8 @@ function getValidScheduleOptionsForFreq(freq) {
   }
 }
 
-// In-map point attribute update
-window.updateScheduleDays = function(idx, daysStr) {
+// In-map point attribute update (Namespaced to avoid collisions)
+window.updateScheduleStoreDays = function(idx, daysStr) {
   if (points.value[idx]) {
     points.value[idx].delivery_days_str = daysStr
     ElMessage.success(`门店 [${points.value[idx].name || idx + 1}] 配送作业日已更新为: ${daysStr}`)
@@ -760,7 +751,7 @@ window.updateScheduleDays = function(idx, daysStr) {
   }
 }
 
-window.updateStoreHomepot = function(idx, val) {
+window.updateScheduleStoreHomepot = function(idx, val) {
   if (points.value[idx]) {
     points.value[idx].is_homepot = Number(val)
     ElMessage.success(`门店 [${points.value[idx].name || idx + 1}] 属性已更新为: ${Number(val) === 1 ? '本埠门店' : '外埠门店'}`)
@@ -1353,8 +1344,8 @@ watch(
 )
 
 onBeforeUnmount(() => {
-  delete window.updateScheduleDays
-  delete window.updateStoreHomepot
+  delete window.updateScheduleStoreDays
+  delete window.updateScheduleStoreHomepot
   if (mouseTool) {
     mouseTool.close(true)
   }

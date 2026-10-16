@@ -39,6 +39,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { DAYS, DAY_COLORS } from '../../utils/mapMarkers.js'
 
 const props = defineProps({
   stores: {
@@ -52,18 +53,6 @@ const props = defineProps({
 })
 
 defineEmits(['select-day'])
-
-const DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-
-const DAY_COLORS = {
-  '周一': '#0284c7',
-  '周二': '#10b981',
-  '周三': '#f59e0b',
-  '周四': '#8b5cf6',
-  '周五': '#ec4899',
-  '周六': '#06b6d4',
-  '周日': '#84cc16',
-}
 
 const getDayStoreCount = (day) => {
   return props.stores.filter((s) => {

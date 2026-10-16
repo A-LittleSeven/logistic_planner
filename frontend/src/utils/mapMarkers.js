@@ -1,4 +1,15 @@
-// 地图标记 HTML 构造 (内联样式: 注入地图 DOM 不受 Vue scoped 样式影响)
+// 星期常量与标准统一配色
+export const DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+
+export const DAY_COLORS = {
+  '周一': '#3b82f6', // 亮蓝
+  '周二': '#10b981', // 翡翠绿
+  '周三': '#ef4444', // 鲜红
+  '周四': '#f59e0b', // 琥珀橙
+  '周五': '#8b5cf6', // 罗兰紫
+  '周六': '#ec4899', // 玫瑰粉
+  '周日': '#06b6d4', // 青蓝
+}
 
 // 簇配色 (取自主题点缀色)
 export const CLUSTER_COLORS = [
@@ -12,6 +23,21 @@ export const ROUTE_COLORS = [
   '#ef4444', '#06b6d4', '#ec4899', '#f97316',
   '#14b8a6', '#6366f1', '#84cc16', '#a855f7'
 ]
+
+/**
+ * 安全转义 HTML 特殊字符，防范地图气泡/弹窗模板中的 XSS 注入
+ */
+export function escapeHtml(str) {
+  if (str === null || str === undefined) return ''
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+
 
 /**
  * 圆形标记。color 可为纯色或 CSS 渐变字符串。

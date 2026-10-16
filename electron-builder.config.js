@@ -30,6 +30,10 @@ module.exports = {
         '!*.pyc',
         '!.env',
         '!.claude/**',
+        '!logistic.db',
+        '!logistic.db*',
+        '!*.sqlite*',
+        '!data/*.db',
       ],
     },
     {

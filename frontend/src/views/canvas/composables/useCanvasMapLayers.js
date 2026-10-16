@@ -2,17 +2,8 @@ import { ref } from 'vue'
 import { loadAMap } from '../../../composables/useAMap.js'
 import { useRouteMapRenderer } from '../../../composables/useRouteMapRenderer.js'
 import { useRouteOptimizer } from '../../../composables/useRouteOptimizer.js'
-import { dotHtml, CLUSTER_COLORS } from '../../../utils/mapMarkers.js'
+import { dotHtml, CLUSTER_COLORS, DAY_COLORS, escapeHtml } from '../../../utils/mapMarkers.js'
 
-const DAY_COLORS = {
-  '周一': '#3b82f6',
-  '周二': '#10b981',
-  '周三': '#ef4444',
-  '周四': '#f59e0b',
-  '周五': '#8b5cf6',
-  '周六': '#ec4899',
-  '周日': '#06b6d4',
-}
 
 export function useCanvasMapLayers(state) {
   const {
@@ -167,10 +158,11 @@ export function useCanvasMapLayers(state) {
         `
       }
 
+      const safeName = escapeHtml(p.name || '未命名门店')
       const infoContent = `
         <div style="padding: 12px; font-size: 12px; line-height: 1.5; color: #1e293b; min-width: 230px; max-width: 290px; background: #fff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
           <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; display: flex; justify-content: space-between;">
-            <span>${p.name || '未命名门店'}</span>
+            <span>${safeName}</span>
             <span style="font-size: 11px; color: #94a3b8;">#${i + 1}</span>
           </div>
           ${clusterSelectHtml}
@@ -328,10 +320,11 @@ export function useCanvasMapLayers(state) {
       }
 
       const isHp = Number(p.is_homepot !== undefined && p.is_homepot !== null ? p.is_homepot : 0)
+      const safeName = escapeHtml(p.name || '未命名门店')
       const infoContent = `
         <div style="padding: 12px; font-size: 12px; line-height: 1.5; color: #1e293b; min-width: 260px; background: #fff; border-radius: 8px;">
           <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; display: flex; justify-content: space-between;">
-            <span>${p.name || '未命名门店'}</span>
+            <span>${safeName}</span>
             <span style="font-size: 11px; color: #94a3b8;">#${i + 1}</span>
           </div>
           <div style="margin-bottom: 5px; color: #64748b;">

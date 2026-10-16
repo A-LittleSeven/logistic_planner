@@ -3,7 +3,7 @@
  * 路线规划与地图调度全要素生命周期渲染引擎 (中心仓 / 高精路网折线 / 站点次序标 / 快递📦标 / 动态弹窗)
  */
 
-import { dotHtml, ROUTE_COLORS } from '../utils/mapMarkers.js'
+import { dotHtml, ROUTE_COLORS, escapeHtml } from '../utils/mapMarkers.js'
 import { useRouteOptimizer } from './useRouteOptimizer.js'
 
 export function useRouteMapRenderer() {
@@ -94,16 +94,18 @@ export function useRouteMapRenderer() {
         })
 
         marker.on('click', () => {
+          const safeName = escapeHtml(p.name || '门店')
+          const safeDays = escapeHtml(p.schedule_day || p.delivery_days_str || '未排班')
           const infoContent = `
             <div style="padding: 10px 14px; font-size: 12px; line-height: 1.5; color: #1e293b; min-width: 220px; background: white; border-radius: 8px;">
               <div style="font-weight: 700; font-size: 13px; color: #64748b; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
-                <span>${p.name || '门店'} (未分配)</span>
+                <span>${safeName} (未分配)</span>
                 <span style="font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 600; ${isHp ? 'background: #e0f2fe; color: #0369a1;' : 'background: #fef3c7; color: #b45309;'}">
                   ${isHp ? '🏠 本埠' : '🚗 外埠'}
                 </span>
               </div>
               <div style="font-size: 11px; color: #64748b;">
-                <span>所属作业日: <strong>${p.schedule_day || p.delivery_days_str || '未排班'}</strong> · 运量: <strong>${p.avg_loads || p.demand || 10}</strong> 箱</span>
+                <span>所属作业日: <strong>${safeDays}</strong> · 运量: <strong>${p.avg_loads || p.demand || 10}</strong> 箱</span>
               </div>
               <div style="margin-top: 8px; border-top: 1px dashed #e2e8f0; padding-top: 6px;">
                 <button onclick="window.updateStoreExpressDay(${globalIdx}, '${activeDayForStore}', 1)" style="width: 100%; font-size: 11px; padding: 4px 6px; border: 1px solid #d8b4fe; border-radius: 4px; background: #faf5ff; color: #7c3aed; font-weight: 600; cursor: pointer;">
@@ -146,17 +148,20 @@ export function useRouteMapRenderer() {
         })
 
         marker.on('click', () => {
+          const safeName = escapeHtml(p.name || '门店')
+          const safeExpDays = escapeHtml(expressDays.join(', ') || activeDayForStore)
+          const safeStoreDays = escapeHtml(storeDays.join(', ') || '未排班')
           const infoContent = `
             <div style="padding: 10px 14px; font-size: 12px; line-height: 1.5; color: #1e293b; min-width: 230px; background: white; border-radius: 8px;">
               <div style="font-weight: 700; font-size: 13px; color: #7c3aed; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
-                <span>${p.name || '门店'}</span>
+                <span>${safeName}</span>
                 <span style="font-size: 10px; background: #f3e8ff; color: #7c3aed; padding: 1px 6px; border-radius: 4px; font-weight: 600;">📦 快递直发</span>
               </div>
               <div style="font-size: 11px; color: #64748b;">
-                <span>快递作业日: <strong style="color: #7c3aed;">${expressDays.join(', ') || activeDayForStore}</strong> (单日运量: <strong>${p.avg_loads || p.demand || 10}</strong> 箱)</span>
+                <span>快递作业日: <strong style="color: #7c3aed;">${safeExpDays}</strong> (单日运量: <strong>${p.avg_loads || p.demand || 10}</strong> 箱)</span>
               </div>
               <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
-                <span>全周作业安排: ${storeDays.join(', ') || '未排班'}</span>
+                <span>全周作业安排: ${safeStoreDays}</span>
               </div>
               <div style="margin-top: 8px; border-top: 1px dashed #e2e8f0; padding-top: 6px;">
                 <button onclick="window.updateStoreExpressDay(${globalIdx}, '${activeDayForStore}', 0)" style="width: 100%; font-size: 11px; padding: 4px 8px; border: 1px solid #86efac; border-radius: 4px; background: #f0fdf4; color: #16a34a; font-weight: 600; cursor: pointer;">
@@ -264,10 +269,11 @@ export function useRouteMapRenderer() {
 
           marker.on('click', () => {
             const dayLabel = currentRDay ? ` (${currentRDay})` : ''
+            const safeName = escapeHtml(p.name || '门店')
             const infoContent = `
               <div style="padding: 10px 14px; font-size: 12px; line-height: 1.5; color: #1e293b; min-width: 230px; background: white; border-radius: 8px;">
                 <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
-                  <span>${p.name || '门店'}</span>
+                  <span>${safeName}</span>
                   <span style="font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 600; ${isHp ? 'background: #e0f2fe; color: #0369a1;' : 'background: #fef3c7; color: #b45309;'}">
                     ${isHp ? '🏠 本埠' : '🚗 外埠'}
                   </span>

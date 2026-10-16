@@ -318,12 +318,6 @@ const handleSelectStore = (item) => {
 }
 
 // Global window actions for map InfoWindow button
-window.updateStoreExpressDay = function (globalIdx, day, isExp) {
-  const store = stores.value[globalIdx]
-  if (store) {
-    handleToggleStoreExpress(store, day, isExp, renderMap)
-  }
-}
 
 window.moveCanvasStore = function (pointIdx, targetClusterVal) {
   let targetClusterId
