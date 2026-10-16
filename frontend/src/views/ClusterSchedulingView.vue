@@ -769,43 +769,68 @@ window.updateStoreHomepot = function(idx, val) {
   }
 }
 
-// 缓存纯色圆形图标 Base64 数据 URI，避免重复生成
+// 缓存圆形图标 Base64 数据 URI (支持频率徽标、选中态、高分屏抗锯齿)
 const iconCache = new Map()
-function getCircleIcon(color, size = 20, isSelected = false, opacity = 1.0) {
-  const cacheKey = `${color}_${size}_${isSelected}_${opacity}`
+function getCircleIcon(color, size = 20, isSelected = false, freq = 1) {
+  const cacheKey = `${color}_${size}_${isSelected}_${freq}`
   if (iconCache.has(cacheKey)) {
     return iconCache.get(cacheKey)
   }
   const canvas = document.createElement('canvas')
   const scale = 2
-  canvas.width = size * scale
-  canvas.height = size * scale
+  // 画布留足边缘容纳外发光和右上角频次角标
+  const pad = 6
+  const totalDim = size + pad * 2
+  canvas.width = totalDim * scale
+  canvas.height = totalDim * scale
   const ctx = canvas.getContext('2d')
   ctx.scale(scale, scale)
 
-  ctx.globalAlpha = opacity
+  const cx = totalDim / 2
+  const cy = totalDim / 2
+  const r = size / 2
 
-  // 绘制外发光/边框 (若被选中)
+  // 1. 选中态外光圈高亮
   if (isSelected) {
     ctx.beginPath()
-    ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2)
+    ctx.arc(cx, cy, r + 2, 0, Math.PI * 2)
     ctx.strokeStyle = '#0d9488'
     ctx.lineWidth = 3
     ctx.stroke()
   }
 
-  // 绘制实心圆
+  // 2. 门店主体圆点
   ctx.beginPath()
-  ctx.arc(size / 2, size / 2, size / 2 - (isSelected ? 4 : 2), 0, Math.PI * 2)
+  ctx.arc(cx, cy, r, 0, Math.PI * 2)
   ctx.fillStyle = color
   ctx.fill()
   ctx.strokeStyle = '#ffffff'
   ctx.lineWidth = 1.5
   ctx.stroke()
 
+  // 3. 频次角标 (频次 > 1 时在右上角绘制醒目红点与数字)
+  if (freq > 1) {
+    const badgeR = 6.5
+    const bx = cx + r * 0.7
+    const by = cy - r * 0.7
+    ctx.beginPath()
+    ctx.arc(bx, by, badgeR, 0, Math.PI * 2)
+    ctx.fillStyle = '#ef4444'
+    ctx.fill()
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 1.2
+    ctx.stroke()
+
+    ctx.fillStyle = '#ffffff'
+    ctx.font = 'bold 8px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(String(freq), bx, by + 0.5)
+  }
+
   const dataUri = canvas.toDataURL()
   iconCache.set(cacheKey, dataUri)
-  return dataUri
+  return { dataUri, totalDim }
 }
 
 function renderPoints() {
@@ -846,36 +871,38 @@ function renderPoints() {
   })
 
   const labelMarkers = []
+  const selectedSet = new Set(selectedPointIndices.value)
+  const isFilterActive = selectedDay.value !== '全部'
 
   points.value.forEach((p, idx) => {
     if (p.lng === '' || p.lat === '') return
 
     let opacity = 1.0
-    if (selectedDay.value !== '全部') {
+    if (isFilterActive) {
       const match = p.delivery_days_str && p.delivery_days_str.includes(selectedDay.value)
       if (!match) {
-        opacity = 0.15
+        opacity = 0.2
       }
     }
 
-    const isSelected = selectedPointIndices.value.includes(idx)
+    const isSelected = selectedSet.has(idx)
     const color = getPointColor(p, idx)
     const size = isSelected ? 24 : 18
 
     const storeFreq = Math.round(Number(p.frequency || (p.delivery_days_str ? p.delivery_days_str.split(',').filter(Boolean).length : 1)))
     p.frequency = storeFreq
 
-    const iconUri = getCircleIcon(color, size, isSelected, opacity)
+    const { dataUri, totalDim } = getCircleIcon(color, size, isSelected, storeFreq)
 
     // 配置 LabelMarker 标注
     const markerConfig = {
       position: [Number(p.lng), Number(p.lat)],
-      opacity,
+      opacity, // 由 LabelMarker 单独控制图层透明度，Icon 内部保持完全不透明以避免重复衰减
       rank: isSelected ? 2 : 1,
       icon: {
         type: 'image',
-        image: iconUri,
-        size: [size, size],
+        image: dataUri,
+        size: [totalDim, totalDim],
         anchor: 'center'
       },
       text: {
@@ -907,7 +934,6 @@ function renderPoints() {
   })
 
   labelsLayer.add(labelMarkers)
-  mapObj.add(labelsLayer)
   mapPanel.value.addOverlay(labelsLayer)
 }
 
