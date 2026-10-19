@@ -343,6 +343,20 @@ def _solve_heterogeneous_routes_with_or(
         True,
         "Capacity",
     )
+
+    # 必须先调用 AddDimension 注册 "Distance" 维度，才能调用 GetDimensionOrDie 获取
+    max_distance_capacity = 600 * _DISTANCE_SCALE  # 单车最大里程上限 (3000 km)
+    routing.AddDimension(
+        transit_callback_index,
+        0,  # 无松弛等待
+        max_distance_capacity,
+        True,  # 累加里程从 0 开始
+        "Distance",
+    )
+
+    distance_dimension = routing.GetDimensionOrDie("Distance")
+    distance_dimension.SetGlobalSpanCostCoefficient(442)
+
     # 我们设置一个非常大的基础固定成本来尽量减少使用的车辆总数，
     # 同时对容量大的车辆给予一定的成本减免（减去与其容量成正比的值），从而让求解器更倾向于选用大车。
     base_cost = max(max(row) for row in distance_matrix) * len(demands) * 100
