@@ -16,7 +16,7 @@ class DBStore(Base):
     avg_loads = Column(Float, default=0.0)             # 门店箱数 / 需求量
     frequency = Column(Integer, default=1)             # 配送频次 (周配送次数)
     store_freq_remains = Column(Integer, nullable=True)# 门店剩余频次
-    is_homepot = Column(Integer, default=0)            # 是否本埠门店 (1:本埠, 0:外埠)
+    is_homepot = Column(Integer, default=1)            # 是否本埠门店 (1:本埠, 0:外埠)
     store_is_need_dist = Column(Boolean, default=True) # 门店是否需要配送
     service_time = Column(Float, default=0.5)         # 门店卸货服务时间(小时)
     available_truck = Column(String, nullable=True)    # 可配送车型 (以逗号分隔或JSON字符串)

@@ -22,7 +22,7 @@ def build_store_node(row: Dict[str, Any], idx: int) -> StoreNode:
         warzone=str(row.get('warzone', '0')),
         district=str(row.get('district', '')),
         name=str(row.get('shop_name', idx)),
-        is_homepot=int(row.get('is_homepot', 0)),
+        is_homepot=int(row.get('is_homepot', 1)),
         store_lon=float(row['lng']),
         store_lat=float(row['lat']),
         sdist_warehouse=float(row['s_dist']),

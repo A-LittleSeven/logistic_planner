@@ -76,9 +76,9 @@ def to_store_node(
     avg_loads = float(d.get("avg_loads") or d.get("demand") or 10.0)
 
     try:
-        is_homepot = int(d.get("is_homepot") if d.get("is_homepot") is not None else 0)
+        is_homepot = int(d.get("is_homepot") if d.get("is_homepot") is not None else 1)
     except (ValueError, TypeError):
-        is_homepot = 0
+        is_homepot = 1
 
     return StoreNode(
         point_idx=default_idx,

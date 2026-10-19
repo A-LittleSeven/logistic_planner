@@ -1,10 +1,6 @@
 import axios from 'axios'
 
-// Electron 环境下直连后端，Web 开发环境走 Vite 代理
-const isElectron = typeof window !== 'undefined' && window.electronAPI?.isElectron
-const baseURL = isElectron
-  ? 'http://127.0.0.1:8000'
-  : (import.meta.env.VITE_API_BASE || '')
+const baseURL = import.meta.env.VITE_API_BASE || ''
 
 const http = axios.create({ baseURL, timeout: 600000 })
 
@@ -17,10 +13,6 @@ http.interceptors.response.use(
   }
 )
 
-export const locationApi = {
-  solve: (data) => http.post('/api/location/solve', data),
-  algorithms: () => http.get('/api/location/algorithms'),
-}
 
 export const routingApi = {
   solve: (data) => http.post('/api/routing/solve', data),
@@ -32,6 +24,8 @@ export const routingApi = {
 export const clusteringApi = {
   solve: (data) => http.post('/api/clustering/solve', data),
   solveSchedule: (data) => http.post('/api/clustering/solve_schedule', data),
+  savePlan: (data) => http.post('/api/clustering/save_plan', data),
+  saveSchedule: (data) => http.post('/api/clustering/save_schedule', data),
   algorithms: () => http.get('/api/clustering/algorithms'),
   scheduleAlgorithms: () => http.get('/api/clustering/schedule/algorithms'),
 }
