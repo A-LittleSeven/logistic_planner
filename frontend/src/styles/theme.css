@@ -338,170 +338,161 @@ button {
   background: #f8fafc;
 }
 
-/* ===== 高级规划工具统一功能区规范 ===== */
+/* ===== 通用业务页面骨架规范 ===== */
 
-.data-source-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 6px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: #f1f5f9;
-  padding: 2px 8px;
-  border-radius: 4px;
-  border: 1px solid #e2e8f0;
-}
-
-.empty-guide-card {
-  text-align: center;
-  padding: 14px 12px !important;
-  margin-bottom: 12px;
-  background: #f8fafc;
-  border: 1px dashed var(--border-strong);
-}
-
-.empty-guide-text {
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.5;
-  margin-bottom: 10px;
-}
-
-.empty-guide-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.empty-guide-actions .lp-btn {
-  flex: 1;
-}
-
-.actions-container {
-  padding: 12px !important;
-  margin-bottom: 12px;
-}
-
-.main-solve-row {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.main-solve-btn {
-  flex: 1;
-  height: 38px !important;
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
-}
-
-.gear-btn {
-  padding: 0 12px !important;
-  font-size: 16px !important;
-  background: #f8fafc !important;
-}
-
-.gear-btn:hover {
-  background: var(--primary-light) !important;
-}
-
-.actions-toolbar-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.actions-toolbar-grid .lp-btn {
-  height: 32px;
-  font-size: 12px;
-  padding: 0 8px;
-}
-
-.is-box-selecting {
-  background-color: #f43f5e !important;
-  color: #ffffff !important;
-  border-color: #e11d48 !important;
-  font-weight: 600;
-  box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.2);
-}
-
-.actions-footer-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-top: 8px;
-  margin-top: 4px;
-  border-top: 1px dashed var(--border);
-  gap: 8px;
-}
-
-.footer-sub-btn {
-  background: transparent;
-  border: none;
-  font-size: 11px;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 3px 6px;
-  border-radius: 4px;
-  transition: var(--transition-fast);
-}
-
-.footer-sub-btn:hover {
-  color: var(--primary);
-  background: var(--primary-light);
-}
-
-.footer-clear-btn:hover {
-  color: var(--accent-danger);
-  background: var(--accent-danger-soft);
-}
-
-/* 统一批量框选浮动卡片 */
-.batch-action-card {
-  margin-bottom: 12px;
-  border: 2px solid var(--accent-teal) !important;
-  background: #f0fdfa !important;
-  padding: 12px !important;
-  border-radius: var(--radius) !important;
-  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.12);
-}
-
-.batch-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.batch-card-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: #0d9488;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.batch-close-btn {
-  border: none;
-  background: transparent;
-  color: #94a3b8;
-  cursor: pointer;
-  font-size: 15px;
-  line-height: 1;
-  padding: 2px;
-}
-
-.batch-close-btn:hover {
-  color: #0f172a;
-}
-
-.batch-card-body {
+.app-page-container,
+.vehicle-manage-page,
+.depot-manage-page,
+.history-page,
+.store-manage-container {
   display: flex;
   flex-direction: column;
+  gap: 16px;
+}
+
+.app-page-header,
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.app-page-title,
+.page-header .title,
+.page-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 4px 0;
+}
+
+.app-page-subtitle,
+.page-header .subtitle,
+.page-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.app-table-card,
+.table-card,
+.filter-card,
+.main-card {
+  border-radius: var(--radius);
+}
+
+.app-toolbar,
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.app-toolbar-left,
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.app-toolbar-right,
+.toolbar-right {
+  display: flex;
+  align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ===== 规划工作台阶段侧栏通用面板规范 (Scoped to .stage-content-scroll) ===== */
+
+.stage-content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stage-content-scroll .panel-section {
+  margin-bottom: 2px;
+}
+
+.stage-content-scroll .section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 4px 0;
+}
+
+.stage-content-scroll .section-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.stage-content-scroll .panel-card {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
+.stage-content-scroll .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stage-content-scroll .form-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-regular);
+}
+
+.stage-content-scroll .sub-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ===== 通用提示与代码展示规范 ===== */
+
+.json-code {
+  background-color: #0f172a;
+  color: #38bdf8;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.warning-box {
+  background: #fffbeb;
+  color: #b45309;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.error-box {
+  background-color: #fef2f2;
+  color: #b91c1c;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
 }
 

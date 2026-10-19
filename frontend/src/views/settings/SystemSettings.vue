@@ -1,19 +1,11 @@
 <template>
   <div class="settings-container">
     <!-- Header -->
-    <div class="settings-header">
-      <div class="title-row">
-        <div class="icon-box">
-          <el-icon :size="24" color="#0284c7"><Setting /></el-icon>
-        </div>
-        <div>
-          <h1 class="page-title">系统参数与密钥配置</h1>
-          <p class="page-desc">
-            维护高德地图开放平台 Web 端 JS API Key 与安全密钥。密钥在前端默认隐藏保护，由后端 SQLite 安全存储并进行 MD5 密文加密。
-          </p>
-        </div>
-      </div>
-    </div>
+    <AppPageHeader
+      title="系统参数与密钥配置"
+      subtitle="维护高德地图开放平台 Web 端 JS API Key 与安全密钥。密钥在前端默认隐藏保护，由后端 SQLite 安全存储并进行 MD5 密文加密。"
+      :icon="Setting"
+    />
 
     <div class="settings-grid">
       <!-- Left Column: Key & Secret Configuration -->
@@ -271,6 +263,7 @@ import {
   InfoFilled
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AppPageHeader from '../../components/common/AppPageHeader.vue'
 import {
   testAMapConnection,
   fetchAMapConfigFromBackend,
@@ -416,39 +409,6 @@ onMounted(() => {
   padding: 24px 32px;
   max-width: 1320px;
   margin: 0 auto;
-}
-
-.settings-header {
-  margin-bottom: 24px;
-}
-
-.title-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.icon-box {
-  width: 46px;
-  height: 46px;
-  border-radius: 10px;
-  background: #e0f2fe;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.page-desc {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: #64748b;
 }
 
 .settings-grid {

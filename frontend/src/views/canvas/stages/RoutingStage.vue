@@ -464,52 +464,6 @@ const handleMoveStoreBetweenRoutes = (sourceRouteIdx, storeSeq, targetRouteVal) 
 </script>
 
 <style scoped>
-.stage-content-scroll {
-  flex: 1;
-  overflow-y: auto;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.panel-section {
-  margin-bottom: 2px;
-}
-
-.section-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0 0 4px 0;
-}
-
-.section-desc {
-  font-size: 11px;
-  color: #64748b;
-  margin: 0;
-  line-height: 1.4;
-}
-
-.panel-card {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.form-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: #475569;
-}
-
 .fleet-tag-list {
   display: flex;
   flex-wrap: wrap;
@@ -520,7 +474,7 @@ const handleMoveStoreBetweenRoutes = (sourceRouteIdx, storeSeq, targetRouteVal) 
   background: #ffffff;
   border: 1px solid #cbd5e1;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   font-size: 11px;
   display: flex;
   align-items: center;
@@ -528,17 +482,17 @@ const handleMoveStoreBetweenRoutes = (sourceRouteIdx, storeSeq, targetRouteVal) 
 }
 
 .fleet-tag-cap {
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 10px;
 }
 
 .remove-tag {
-  color: #94a3b8;
+  color: var(--text-light);
   cursor: pointer;
   font-weight: 700;
 }
 
 .remove-tag:hover {
-  color: #ef4444;
+  color: var(--accent-danger);
 }
 </style>

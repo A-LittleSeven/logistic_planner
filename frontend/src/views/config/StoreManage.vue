@@ -2,22 +2,36 @@
   <div class="store-manage-container">
     <!-- Top Statistics Banner -->
     <div class="stats-row">
-      <el-card shadow="never" class="stat-card">
-        <div class="stat-label">总门店数</div>
-        <div class="stat-value text-blue">{{ stores.length }} <span class="stat-unit">家</span></div>
-      </el-card>
-      <el-card shadow="never" class="stat-card">
-        <div class="stat-label">本埠 / 外埠门店</div>
-        <div class="stat-value text-green">{{ homepotCount }} <span class="stat-unit">/ {{ stores.length - homepotCount }} 家</span></div>
-      </el-card>
-      <el-card shadow="never" class="stat-card">
-        <div class="stat-label">覆盖仓库数</div>
-        <div class="stat-value text-amber">{{ warehouseOptions.length }} <span class="stat-unit">个仓库</span></div>
-      </el-card>
-      <el-card shadow="never" class="stat-card">
-        <div class="stat-label">日均总需求量</div>
-        <div class="stat-value text-purple">{{ totalAvgLoads.toLocaleString() }} <span class="stat-unit">箱</span></div>
-      </el-card>
+      <StatCard
+        layout="vertical"
+        label="总门店数"
+        :value="stores.length"
+        unit="家"
+        theme="blue"
+      />
+      <StatCard
+        layout="vertical"
+        label="本埠 / 外埠门店"
+        theme="green"
+      >
+        <template #value>
+          {{ homepotCount }} <span class="stat-unit">/ {{ stores.length - homepotCount }} 家</span>
+        </template>
+      </StatCard>
+      <StatCard
+        layout="vertical"
+        label="覆盖仓库数"
+        :value="warehouseOptions.length"
+        unit="个仓库"
+        theme="amber"
+      />
+      <StatCard
+        layout="vertical"
+        label="日均总需求量"
+        :value="totalAvgLoads.toLocaleString()"
+        unit="箱"
+        theme="purple"
+      />
     </div>
 
     <!-- Main Content Card -->
@@ -409,8 +423,8 @@ import { Plus, Refresh, Search, Upload, Download, Delete, UploadFilled, Document
 import { ElMessage } from 'element-plus'
 import * as XLSX from 'xlsx'
 import { parseFileUniversal } from '../../utils/excelImport.js'
-
-const API_BASE = '/api/store'
+import { storeApi, depotApi } from '../../api/client.js'
+import StatCard from '../../components/common/StatCard.vue'
 
 const stores = ref([])
 const loading = ref(false)
@@ -552,19 +566,15 @@ const indexMethod = (index) => (currentPage.value - 1) * pageSize.value + index 
 
 const fetchDepots = async () => {
   try {
-    const res = await fetch('/api/depot/')
-    if (res.ok) {
-      depotList.value = await res.json()
-    }
+    const data = await depotApi.list()
+    depotList.value = data
   } catch (e) {}
 }
 
 const fetchStores = async () => {
   loading.value = true
   try {
-    const res = await fetch(`${API_BASE}/?limit=5000`)
-    if (!res.ok) throw new Error('获取门店数据失败')
-    const data = await res.json()
+    const data = await storeApi.list()
     stores.value = data
   } catch (err) {
     ElMessage.error(err.message)
@@ -624,26 +634,10 @@ const handleSubmit = async () => {
     submitting.value = true
     try {
       if (isEdit.value) {
-        const res = await fetch(`${API_BASE}/${form.value.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form.value)
-        })
-        if (!res.ok) {
-          const errData = await res.json()
-          throw new Error(errData.detail || '更新失败')
-        }
+        await storeApi.update(form.value.id, form.value)
         ElMessage.success('门店信息更新成功')
       } else {
-        const res = await fetch(`${API_BASE}/`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form.value)
-        })
-        if (!res.ok) {
-          const errData = await res.json()
-          throw new Error(errData.detail || '新增失败')
-        }
+        await storeApi.create(form.value)
         ElMessage.success('新增门店成功')
       }
       dialogVisible.value = false
@@ -658,8 +652,7 @@ const handleSubmit = async () => {
 
 const handleDelete = async (id) => {
   try {
-    const res = await fetch(`${API_BASE}/${id}`, { method: 'DELETE' })
-    if (!res.ok) throw new Error('删除失败')
+    await storeApi.delete(id)
     ElMessage.success('门店已删除')
     fetchStores()
   } catch (err) {
@@ -669,8 +662,7 @@ const handleDelete = async (id) => {
 
 const handleClearAll = async () => {
   try {
-    const res = await fetch(`${API_BASE}/clear/all`, { method: 'DELETE' })
-    if (!res.ok) throw new Error('清空失败')
+    await storeApi.clearAll()
     ElMessage.success('所有门店已清空')
     stores.value = []
     currentPage.value = 1
@@ -717,16 +709,7 @@ const submitBatchImport = async () => {
       stores: parsedList.value,
       mode: importMode.value
     }
-    const res = await fetch(`${API_BASE}/batch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    if (!res.ok) {
-      const errData = await res.json()
-      throw new Error(errData.detail || '导入入库失败')
-    }
-    const result = await res.json()
+    const result = await storeApi.batchCreate(payload)
     ElMessage.success(`导入成功！新增 ${result.inserted} 家，更新 ${result.updated} 家`)
     importDialogVisible.value = false
     fetchStores()
@@ -978,82 +961,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.store-manage-container {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
 .stats-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
 
-.stat-card {
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.stat-label {
-  font-size: 13px;
-  color: #64748b;
-  margin-bottom: 4px;
-}
-
-.stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.stat-unit {
-  font-size: 13px;
-  font-weight: 400;
-  color: #94a3b8;
-}
-
-.text-blue { color: #0284c7; }
-.text-green { color: #16a34a; }
-.text-amber { color: #d97706; }
-.text-purple { color: #7c3aed; }
-
-.main-card {
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.font-mono {
-  font-family: Monaco, Menlo, Consolas, monospace;
-  font-size: 13px;
-  color: #334155;
-}
-
 .font-semibold {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text);
 }
 
 .pagination-wrap {
@@ -1070,7 +986,7 @@ onMounted(() => {
   margin-top: 12px;
   background: #f8fafc;
   padding: 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .preview-header {
@@ -1078,15 +994,6 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
-}
-
-.warning-box {
-  background: #fffbeb;
-  color: #b45309;
-  padding: 10px 14px;
-  border-radius: 6px;
-  margin-top: 12px;
-  font-size: 12px;
 }
 
 .warning-box ul {

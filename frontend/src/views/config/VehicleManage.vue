@@ -1,15 +1,14 @@
 <template>
   <div class="vehicle-manage-page">
-    <div class="page-header">
-      <div>
-        <h2 class="title">车型维护</h2>
-        <p class="subtitle">管理物流车队运力参数，包括载重上限、体积、每公里行驶成本以及最大续航里程。</p>
-      </div>
-      <div class="actions">
+    <AppPageHeader
+      title="车型维护"
+      subtitle="管理物流车队运力参数，包括载重上限、体积、每公里行驶成本以及最大续航里程。"
+    >
+      <template #actions>
         <el-button type="primary" :icon="Plus" @click="openAddDialog">新增车型</el-button>
         <el-button :icon="Refresh" @click="fetchVehicles">刷新</el-button>
-      </div>
-    </div>
+      </template>
+    </AppPageHeader>
 
     <!-- Table -->
     <el-card shadow="never" class="table-card">
@@ -111,8 +110,8 @@
 import { ref, onMounted } from 'vue'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-
-const API_BASE = '/api/vehicle'
+import { vehicleApi } from '../../api/client.js'
+import AppPageHeader from '../../components/common/AppPageHeader.vue'
 
 const vehicles = ref([])
 const loading = ref(false)
@@ -143,9 +142,7 @@ const rules = {
 const fetchVehicles = async () => {
   loading.value = true
   try {
-    const res = await fetch(`${API_BASE}/`)
-    if (!res.ok) throw new Error('获取车型数据失败')
-    const data = await res.json()
+    const data = await vehicleApi.list()
     vehicles.value = data
   } catch (err) {
     ElMessage.error(err.message)
@@ -183,26 +180,10 @@ const handleSubmit = async () => {
     submitting.value = true
     try {
       if (isEdit.value) {
-        const res = await fetch(`${API_BASE}/${form.value.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form.value)
-        })
-        if (!res.ok) {
-          const errorData = await res.json()
-          throw new Error(errorData.detail || '更新失败')
-        }
+        await vehicleApi.update(form.value.id, form.value)
         ElMessage.success('车型更新成功')
       } else {
-        const res = await fetch(`${API_BASE}/`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form.value)
-        })
-        if (!res.ok) {
-          const errorData = await res.json()
-          throw new Error(errorData.detail || '新增失败')
-        }
+        await vehicleApi.create(form.value)
         ElMessage.success('车型添加成功')
       }
       dialogVisible.value = false
@@ -217,8 +198,7 @@ const handleSubmit = async () => {
 
 const handleDelete = async (id) => {
   try {
-    const res = await fetch(`${API_BASE}/${id}`, { method: 'DELETE' })
-    if (!res.ok) throw new Error('删除失败')
+    await vehicleApi.delete(id)
     ElMessage.success('车型删除成功')
     fetchVehicles()
   } catch (err) {
@@ -231,33 +211,3 @@ onMounted(() => {
 })
 </script>
 
-<style scoped>
-.vehicle-manage-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.title {
-  font-size: 20px;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0 0 4px 0;
-}
-
-.subtitle {
-  font-size: 13px;
-  color: #64748b;
-  margin: 0;
-}
-
-.table-card {
-  border-radius: 8px;
-}
-</style>

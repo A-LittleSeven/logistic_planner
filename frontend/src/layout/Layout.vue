@@ -22,10 +22,10 @@
           text-color="#334155"
           active-text-color="#0284c7"
         >
-          <!-- 0. 核心规划画布 -->
+          <!-- 0. 核心规划工作台 -->
           <div class="menu-group-header">
             <el-icon><DataAnalysis /></el-icon>
-            <span>规划画布</span>
+            <span>规划工作台</span>
           </div>
           <el-menu-item index="/canvas">
             <el-icon><Collection /></el-icon>
@@ -33,31 +33,8 @@
           </el-menu-item>
           <el-menu-item index="/history">
             <el-icon><Timer /></el-icon>
-            <span>历史记录</span>
+            <span>规划历史</span>
           </el-menu-item>
-
-          <div class="menu-divider"></div>
-
-          <!-- 1. 高级工具 (单步独立规划, 与画布三步流水线功能重叠, 默认收起) -->
-          <div class="menu-group-header menu-group-toggle" @click="advancedOpen = !advancedOpen">
-            <el-icon><Connection /></el-icon>
-            <span>高级工具</span>
-            <el-icon class="toggle-arrow" :class="{ 'is-open': advancedOpen }"><ArrowDown /></el-icon>
-          </div>
-          <template v-if="advancedOpen">
-            <el-menu-item index="/clustering/plan">
-              <el-icon><Location /></el-icon>
-              <span>门店分组</span>
-            </el-menu-item>
-            <el-menu-item index="/clustering/schedule">
-              <el-icon><Calendar /></el-icon>
-              <span>门店排班</span>
-            </el-menu-item>
-            <el-menu-item index="/routing/plan">
-              <el-icon><Compass /></el-icon>
-              <span>路线规划</span>
-            </el-menu-item>
-          </template>
 
           <div class="menu-divider"></div>
 
@@ -111,16 +88,8 @@ import { useRoute } from 'vue-router'
 const route = useRoute()
 const activeMenu = ref('')
 
-// 高级工具分组默认收起; 当前页面在该分组内时自动展开
-const ADVANCED_PATHS = ['/clustering/plan', '/clustering/schedule', '/routing/plan']
-const advancedOpen = ref(false)
-
 const isMapView = computed(() => {
-  return [
-    '/clustering/plan',
-    '/clustering/schedule',
-    '/routing/plan',
-  ].includes(route.path) || route.path.startsWith('/canvas/workspace')
+  return route.path.startsWith('/canvas/workspace')
 })
 
 watch(
@@ -130,9 +99,6 @@ watch(
       activeMenu.value = '/canvas'
     } else {
       activeMenu.value = newPath
-    }
-    if (ADVANCED_PATHS.some((p) => newPath.startsWith(p))) {
-      advancedOpen.value = true
     }
   },
   { immediate: true }
@@ -156,7 +122,6 @@ watch(
   padding: 0 24px;
   height: 52px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  -webkit-app-region: drag; /* 允许在 macOS 隐藏标题栏时拖动窗口 */
 }
 
 .logo {

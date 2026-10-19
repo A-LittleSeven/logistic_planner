@@ -1,15 +1,14 @@
 <template>
   <div class="depot-manage-page">
-    <div class="page-header">
-      <div>
-        <h2 class="title">起点管理 (DC中心仓维护)</h2>
-        <p class="subtitle">维护物流配送网络中的发货起点、配送中心 (DC) 与仓库经纬度信息，支持设为默认规划起点。</p>
-      </div>
-      <div class="actions">
+    <AppPageHeader
+      title="起点管理 (DC中心仓维护)"
+      subtitle="维护物流配送网络中的发货起点、配送中心 (DC) 与仓库经纬度信息，支持设为默认规划起点。"
+    >
+      <template #actions>
         <el-button type="primary" :icon="Plus" @click="openAddDialog">新增起点 / DC</el-button>
         <el-button :icon="Refresh" @click="fetchDepots">刷新</el-button>
-      </div>
-    </div>
+      </template>
+    </AppPageHeader>
 
     <!-- Table -->
     <el-card shadow="never" class="table-card">
@@ -142,8 +141,8 @@ import { ref, onMounted } from 'vue'
 import { Plus, Refresh, Location } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getAddressByCoords } from '../../composables/useAMap.js'
-
-const API_BASE = '/api/depot'
+import { depotApi } from '../../api/client.js'
+import AppPageHeader from '../../components/common/AppPageHeader.vue'
 
 const depots = ref([])
 const loading = ref(false)
@@ -178,9 +177,7 @@ const rules = {
 const fetchDepots = async () => {
   loading.value = true
   try {
-    const res = await fetch(`${API_BASE}/`)
-    if (!res.ok) throw new Error('获取起点数据失败')
-    const data = await res.json()
+    const data = await depotApi.list()
     depots.value = data
   } catch (err) {
     ElMessage.error(err.message)
@@ -259,26 +256,10 @@ const handleSubmit = async () => {
     submitting.value = true
     try {
       if (isEdit.value) {
-        const res = await fetch(`${API_BASE}/${form.value.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form.value)
-        })
-        if (!res.ok) {
-          const err = await res.json()
-          throw new Error(err.detail || '更新失败')
-        }
+        await depotApi.update(form.value.id, form.value)
         ElMessage.success('起点/DC更新成功')
       } else {
-        const res = await fetch(`${API_BASE}/`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form.value)
-        })
-        if (!res.ok) {
-          const err = await res.json()
-          throw new Error(err.detail || '新增失败')
-        }
+        await depotApi.create(form.value)
         ElMessage.success('起点/DC创建成功')
       }
       dialogVisible.value = false
@@ -293,8 +274,7 @@ const handleSubmit = async () => {
 
 const handleSetDefault = async (id) => {
   try {
-    const res = await fetch(`${API_BASE}/${id}/set_default`, { method: 'POST' })
-    if (!res.ok) throw new Error('设置默认起点失败')
+    await depotApi.setDefault(id)
     ElMessage.success('已设为默认起点')
     fetchDepots()
   } catch (err) {
@@ -304,8 +284,7 @@ const handleSetDefault = async (id) => {
 
 const handleDelete = async (id) => {
   try {
-    const res = await fetch(`${API_BASE}/${id}`, { method: 'DELETE' })
-    if (!res.ok) throw new Error('删除失败')
+    await depotApi.delete(id)
     ElMessage.success('起点已删除')
     fetchDepots()
   } catch (err) {
@@ -318,39 +297,3 @@ onMounted(() => {
 })
 </script>
 
-<style scoped>
-.depot-manage-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.title {
-  font-size: 20px;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0 0 4px 0;
-}
-
-.subtitle {
-  font-size: 13px;
-  color: #64748b;
-  margin: 0;
-}
-
-.table-card {
-  border-radius: 8px;
-}
-
-.font-mono {
-  font-family: Monaco, Menlo, Consolas, monospace;
-  font-size: 13px;
-  color: #334155;
-}
-</style>

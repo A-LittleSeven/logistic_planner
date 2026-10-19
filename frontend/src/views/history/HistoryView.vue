@@ -1,19 +1,18 @@
 <template>
   <div class="history-page">
-    <div class="page-header">
-      <div>
-        <h2 class="title">历史执行结果</h2>
-        <p class="subtitle">追溯与对比过往执行的路线规划、店群排班与店群聚类任务，支持查看详细输入参数与输出结果。</p>
-      </div>
-      <div class="actions">
+    <AppPageHeader
+      title="历史执行结果"
+      subtitle="追溯与对比过往执行的路线规划、店群排班与店群聚类任务，支持查看详细输入参数与输出结果。"
+    >
+      <template #actions>
         <el-button :icon="Refresh" @click="fetchHistories">刷新记录</el-button>
         <el-popconfirm title="确定要清空全部历史记录吗？" @confirm="handleClearAll">
           <template #reference>
             <el-button type="danger" :icon="Delete" plain>清空历史</el-button>
           </template>
         </el-popconfirm>
-      </div>
-    </div>
+      </template>
+    </AppPageHeader>
 
     <!-- Filter bar -->
     <el-card shadow="never" class="filter-card">
@@ -141,8 +140,8 @@ import { ref, onMounted } from 'vue'
 import { Refresh, Delete, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { exportHistoryTaskToExcel } from '../../utils/historyExport.js'
-
-const API_BASE = '/api/history'
+import { historyApi } from '../../api/client.js'
+import AppPageHeader from '../../components/common/AppPageHeader.vue'
 
 const histories = ref([])
 const loading = ref(false)
@@ -156,15 +155,11 @@ const activeTab = ref('result')
 const fetchHistories = async () => {
   loading.value = true
   try {
-    const params = new URLSearchParams()
-    if (filterType.value) params.append('task_type', filterType.value)
-    if (filterSaveType.value) params.append('save_type', filterSaveType.value)
+    const params = {}
+    if (filterType.value) params.task_type = filterType.value
+    if (filterSaveType.value) params.save_type = filterSaveType.value
     
-    const queryString = params.toString()
-    const url = queryString ? `${API_BASE}/?${queryString}` : `${API_BASE}/`
-    const res = await fetch(url)
-    if (!res.ok) throw new Error('获取历史数据失败')
-    const data = await res.json()
+    const data = await historyApi.list(params)
     histories.value = data
   } catch (err) {
     ElMessage.error(err.message)
@@ -211,8 +206,7 @@ const handleExport = (task) => {
 
 const handleDelete = async (taskId) => {
   try {
-    const res = await fetch(`${API_BASE}/${taskId}`, { method: 'DELETE' })
-    if (!res.ok) throw new Error('删除失败')
+    await historyApi.delete(taskId)
     ElMessage.success('记录已删除')
     fetchHistories()
   } catch (err) {
@@ -222,8 +216,7 @@ const handleDelete = async (taskId) => {
 
 const handleClearAll = async () => {
   try {
-    const res = await fetch(`${API_BASE}/clear/all`, { method: 'DELETE' })
-    if (!res.ok) throw new Error('清空失败')
+    await historyApi.clearAll()
     ElMessage.success('所有记录已清空')
     fetchHistories()
   } catch (err) {
@@ -272,70 +265,10 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.history-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.title {
-  font-size: 20px;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0 0 4px 0;
-}
-
-.subtitle {
-  font-size: 13px;
-  color: #64748b;
-  margin: 0;
-}
-
-.filter-card {
-  border-radius: 8px;
-}
-
-.table-card {
-  border-radius: 8px;
-}
-
-.mono {
-  font-family: monospace;
-  font-size: 12px;
-  color: #475569;
-}
-
 .empty-tip {
   text-align: center;
   padding: 30px 0;
-  color: #94a3b8;
+  color: var(--text-light);
   font-size: 14px;
-}
-
-.json-code {
-  background-color: #0f172a;
-  color: #38bdf8;
-  padding: 12px 16px;
-  border-radius: 6px;
-  font-family: Monaco, Menlo, Consolas, monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  max-height: 420px;
-  overflow-y: auto;
-}
-
-.error-box {
-  background-color: #fef2f2;
-  color: #b91c1c;
-  padding: 10px 14px;
-  border-radius: 6px;
-  margin-bottom: 14px;
-  font-size: 13px;
 }
 </style>
