@@ -4,10 +4,9 @@ import vue from '@vitejs/plugin-vue'
 // 开发时 /api 代理到后端, 前端代码直接用相对路径 /api/... 即可
 export default defineConfig({
   plugins: [vue()],
-  // Electron 环境下使用相对路径加载资源
-  base: './',
+  base: '/',
   build: {
-    outDir: '../electron/renderer',
+    outDir: 'dist',
     emptyOutDir: true,
   },
   server: {
