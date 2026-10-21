@@ -97,9 +97,17 @@ def solve_or_tools_vrp(req: RoutingSolveRequest, provider: DistanceProvider) -> 
         })
 
     opts = req.options or {}
-    max_truck_capacity_rate = float(opts.get("max_capacity_rate", 1.0))
+    max_truck_capacity_rate = float(opts.get("max_capacity_rate", opts.get("max_truck_capacity_rate", 1.0)))
     time_limit_seconds = int(opts.get("time_limit_seconds", opts.get("time_limit", 5)))
     return_to_depot = bool(opts.get("return_to_depot", False))
+    distance_factor = float(opts.get("distance_factor", opts.get("detour_factor", 1.3)))
+    cost_per_km = float(opts.get("cost_per_km", 4.0))
+    vehicle_fixed_cost = float(opts.get("vehicle_fixed_cost", opts.get("fixed_cost", 200.0)))
+    underfill_penalty_per_unit = float(opts.get("underfill_penalty_per_unit", opts.get("underfill_penalty", 0.5)))
+    span_cost_coefficient = int(opts.get("span_cost_coefficient", 0))
+    max_distance_km = float(opts.get("max_distance_km", 600.0))
+    max_stop_distance_km = float(opts.get("max_stop_distance_km", opts.get("max_relative_distance_km", 35.0)))
+    inter_stop_penalty_factor = float(opts.get("inter_stop_penalty_factor", 4.0))
 
     # Pass the heterogeneous vehicle fleet (trucks)
     trucks_data = [t.model_dump() if hasattr(t, "model_dump") else dict(t) for t in req.trucks]
@@ -113,6 +121,14 @@ def solve_or_tools_vrp(req: RoutingSolveRequest, provider: DistanceProvider) -> 
         warehouse_lat=depot_point.lat,
         time_limit_seconds=time_limit_seconds,
         return_to_depot=return_to_depot,
+        distance_factor=distance_factor,
+        cost_per_km=cost_per_km,
+        vehicle_fixed_cost=vehicle_fixed_cost,
+        underfill_penalty_per_unit=underfill_penalty_per_unit,
+        span_cost_coefficient=span_cost_coefficient,
+        max_distance_km=max_distance_km,
+        max_stop_distance_km=max_stop_distance_km,
+        inter_stop_penalty_factor=inter_stop_penalty_factor,
     )
 
     routes_list = []
@@ -145,13 +161,22 @@ def solve_or_tools_vrp(req: RoutingSolveRequest, provider: DistanceProvider) -> 
             "load": float(route.get("load", 0.0)),
             "is_homepot": int(route.get("is_homepot") if route.get("is_homepot") is not None else 1),
             "return_to_depot": bool(return_to_depot),
+            "fill_rate": float(route.get("fill_rate", 0.0)),
+            "cost_per_km": float(route.get("cost_per_km", cost_per_km)),
+            "fixed_cost": float(route.get("fixed_cost", vehicle_fixed_cost)),
+            "transport_cost": float(route.get("transport_cost", 0.0)),
+            "total_cost": float(route.get("total_cost", 0.0)),
+            "max_stop_distance_km": float(route.get("max_stop_distance_km", 0.0)),
+            "max_store_distance_km": float(route.get("max_store_distance_km", 0.0)),
         })
         total_dist += route.get("distance_km", 0.0)
 
+    total_cost_sum = sum(r.get("total_cost", 0.0) for r in routes_list)
     return {
         "algorithm": "ortools",
         "routes": routes_list,
-        "total_distance": float(total_dist),
+        "total_distance": round(float(total_dist), 2),
+        "total_cost": round(float(total_cost_sum), 2),
         "total_stores": len(customers),
         "return_to_depot": bool(return_to_depot),
         "points": [p.model_dump() for p in req.points]

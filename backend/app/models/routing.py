@@ -20,12 +20,18 @@ class RoutePoint(BaseModel):
 
 
 class TruckProfile(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     name: str
     capacity: float
     count: int
+    cost_per_km: Optional[float] = None  # 每公里行驶成本 (元/km)
+    fixed_cost: Optional[float] = None   # 单车固定发车成本 (元/车)
 
 
 class RoutingSolveRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     points: List[RoutePoint]
     trucks: List[TruckProfile] = Field(default_factory=list)
     algorithm: str = "ortools"  # Google OR-Tools CVRP
@@ -33,19 +39,33 @@ class RoutingSolveRequest(BaseModel):
 
 
 class RouteResult(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     truck_name: str
     order: List[int]  # 访问顺序在 points 中的索引
     distance: float
     load: float
     is_homepot: int = 0
+    fill_rate: Optional[float] = None       # 车辆装载率 (0.0 ~ 1.0)
+    cost_per_km: Optional[float] = None     # 使用的每公里成本
+    fixed_cost: Optional[float] = None      # 固定发车成本
+    transport_cost: Optional[float] = None  # 里程变动运费
+    total_cost: Optional[float] = None      # 综合总成本 (fixed + transport)
+    max_stop_distance_km: Optional[float] = None  # 同路线相邻门店最大相对距离
+    max_store_distance_km: Optional[float] = None # 同路线内门店最大跨度直径
+    return_to_depot: Optional[bool] = None
 
 
 class RoutingSolveResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     algorithm: str
     routes: List[RouteResult]
     total_distance: float
     total_stores: int
     points: List[dict]
+    total_cost: Optional[float] = None
+    return_to_depot: Optional[bool] = None
 
 
 class GlobalRoutingSolveRequest(BaseModel):
