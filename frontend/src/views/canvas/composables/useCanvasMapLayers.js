@@ -90,16 +90,20 @@ export function useCanvasMapLayers(state) {
     const isAny = highlightedRouteIdx.value !== null
     routeOverlays.forEach((ro, rIdx) => {
       const isHl = highlightedRouteIdx.value === rIdx
-      ro.polyline.setOptions({
-        strokeOpacity: isAny ? (isHl ? 1.0 : 0.2) : 0.85,
-        strokeWeight: isHl ? 6 : (isAny ? 3 : 5),
-        zIndex: isHl ? 120 : (isAny ? 40 : 80),
-      })
-      ro.markers.forEach((m) => {
-        if (changedIdxs.includes(rIdx)) m.marker.setContent(isHl ? m.dotHighlight : m.dotNormal)
-        if (m.marker.setOpacity) m.marker.setOpacity(isAny ? (isHl ? 1.0 : 0.3) : 1.0)
-        if (m.marker.setzIndex) m.marker.setzIndex(isHl ? 130 : 100)
-      })
+      if (ro.polyline && typeof ro.polyline.setOptions === 'function') {
+        ro.polyline.setOptions({
+          strokeOpacity: isAny ? (isHl ? 1.0 : 0.2) : 0.85,
+          strokeWeight: isHl ? 6 : (isAny ? 3 : 5),
+          zIndex: isHl ? 120 : (isAny ? 40 : 80),
+        })
+      }
+      if (ro.markers) {
+        ro.markers.forEach((m) => {
+          if (changedIdxs.includes(rIdx)) m.marker.setContent(isHl ? m.dotHighlight : m.dotNormal)
+          if (m.marker.setOpacity) m.marker.setOpacity(isAny ? (isHl ? 1.0 : 0.3) : 1.0)
+          if (m.marker.setzIndex) m.marker.setzIndex(isHl ? 130 : 100)
+        })
+      }
     })
   }
 
@@ -115,8 +119,13 @@ export function useCanvasMapLayers(state) {
     if (fitBounds && highlightedRouteIdx.value !== null && routeOverlays[rIdx]) {
       const ro = routeOverlays[rIdx]
       const mapObj = mapPanelRef.value?.getMap ? mapPanelRef.value.getMap() : amapInstance.value
-      if (mapObj && ro.polyline) {
-        mapObj.setFitView([ro.polyline, ...(ro.markers?.map((m) => m.marker) || [])])
+      if (mapObj) {
+        const boundsOverlays = []
+        if (ro.polyline) boundsOverlays.push(ro.polyline)
+        if (ro.markers?.length) boundsOverlays.push(...ro.markers.map((m) => m.marker))
+        if (boundsOverlays.length) {
+          mapObj.setFitView(boundsOverlays)
+        }
       }
     } else if (fitBounds && highlightedRouteIdx.value === null) {
       mapPanelRef.value?.fitView()
@@ -373,7 +382,7 @@ export function useCanvasMapLayers(state) {
     const unassigned = targetStores.filter((p) => !routedKeys.has(p.shop_code || p.name) && !isStoreExpressOnDay(p, selectedRoutingDay.value, stores.value))
     const currentExpress = stores.value.filter((s) => isStoreExpressOnDay(s, selectedRoutingDay.value, stores.value))
 
-    renderRouteMapLayers({
+    const overlays = renderRouteMapLayers({
       amap: A,
       mapPanel: mapPanelRef.value,
       depot: { name: canvas.depot_name || '中心仓', lng: Number(canvas.depot_lng), lat: Number(canvas.depot_lat) },
@@ -386,6 +395,10 @@ export function useCanvasMapLayers(state) {
       currentDay: selectedRoutingDay.value,
       openInfoWindowAt,
     })
+    routeOverlays.length = 0
+    if (overlays && overlays.length) {
+      routeOverlays.push(...overlays)
+    }
   }
 
   const renderMap = async (shouldFit = false) => {
@@ -403,6 +416,7 @@ export function useCanvasMapLayers(state) {
     if (!A) return
 
     mapPanelRef.value.clearAll()
+    routeOverlays.length = 0
     if (sharedInfoWindow) sharedInfoWindow.close()
 
     const depotLng = Number(canvas.depot_lng)

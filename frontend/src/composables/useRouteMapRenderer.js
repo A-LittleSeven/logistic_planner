@@ -34,6 +34,17 @@ export function useRouteMapRenderer() {
 
     const routeOverlays = []
 
+    // 0. Pre-index allStores with Map and selectedPointIndices with Set for O(1) lookups
+    const storeIndexMap = new Map()
+    if (allStores && allStores.length) {
+      allStores.forEach((s, idx) => {
+        storeIndexMap.set(s, idx)
+        if (s.shop_code) storeIndexMap.set(`code_${s.shop_code}`, idx)
+        if (s.name) storeIndexMap.set(`name_${s.name}`, idx)
+      })
+    }
+    const selectedIndicesSet = new Set(selectedPointIndices || [])
+
     // 1. Draw Central Depot Marker (起点中心仓)
     if (depot && depot.lng && depot.lat) {
       const { content, offset } = dotHtml({ text: '仓', color: '#0f172a', size: 30 })
@@ -71,8 +82,8 @@ export function useRouteMapRenderer() {
     if (unassignedStores && unassignedStores.length) {
       unassignedStores.forEach((p) => {
         if (!p || p.lng === '' || p.lat === '') return
-        const globalIdx = allStores.indexOf(p)
-        const isBoxSelected = selectedPointIndices.includes(globalIdx)
+        const globalIdx = storeIndexMap.get(p) ?? (p.shop_code ? storeIndexMap.get(`code_${p.shop_code}`) : undefined) ?? (p.name ? storeIndexMap.get(`name_${p.name}`) : undefined) ?? -1
+        const isBoxSelected = selectedIndicesSet.has(globalIdx)
         const isHp = Number(p.is_homepot) === 1
         const storeDays = getStoreScheduleDays(p)
         const activeDayForStore = (currentDay !== '全部') ? currentDay : (storeDays[0] || '全部')
@@ -125,8 +136,8 @@ export function useRouteMapRenderer() {
     if (expressStores && expressStores.length) {
       expressStores.forEach((p) => {
         if (!p || p.lng === '' || p.lat === '') return
-        const globalIdx = allStores ? allStores.findIndex((s) => s === p || (s.shop_code && s.shop_code === p.shop_code) || s.name === p.name) : -1
-        const isBoxSelected = selectedPointIndices.includes(globalIdx)
+        const globalIdx = storeIndexMap.get(p) ?? (p.shop_code ? storeIndexMap.get(`code_${p.shop_code}`) : undefined) ?? (p.name ? storeIndexMap.get(`name_${p.name}`) : undefined) ?? -1
+        const isBoxSelected = selectedIndicesSet.has(globalIdx)
         const storeDays = getStoreScheduleDays(p)
         const expressDays = getStoreExpressDays(p)
         const activeDayForStore = (currentDay !== '全部') ? currentDay : (expressDays[0] || '全部')
@@ -205,8 +216,9 @@ export function useRouteMapRenderer() {
           }
         }
 
+        let polyline = null
         if (polyPath && polyPath.length >= 2) {
-          const polyline = new A.Polyline({
+          polyline = new A.Polyline({
             path: polyPath,
             strokeColor: color,
             strokeWeight: routeWeight,
@@ -223,8 +235,8 @@ export function useRouteMapRenderer() {
         const routeMarkers = []
         pts.forEach((p, seqIdx) => {
           if (!p || p.lng === '' || p.lat === '') return
-          const globalIdx = allStores ? allStores.findIndex((s) => s === p || (s.shop_code && s.shop_code === p.shop_code) || s.name === p.name) : -1
-          const isBoxSelected = selectedPointIndices.includes(globalIdx)
+          const globalIdx = storeIndexMap.get(p) ?? (p.shop_code ? storeIndexMap.get(`code_${p.shop_code}`) : undefined) ?? (p.name ? storeIndexMap.get(`name_${p.name}`) : undefined) ?? -1
+          const isBoxSelected = selectedIndicesSet.has(globalIdx)
           const isHp = Number(p.is_homepot) === 1
 
           const { content: dotNormal, offset } = dotHtml({
@@ -248,26 +260,26 @@ export function useRouteMapRenderer() {
             title: `${p.name} (${r.day ? r.day + ' ' : ''}路线 ${(r.day_route_idx ?? rIdx) + 1} 第${seqIdx + 1}站)`,
           })
 
-          // 过滤可选路线：严格仅支持当天路线调换
-          const currentRDay = r.day || (currentDay !== '全部' ? currentDay : '')
-          const sameDayRoutes = routes
-            .map((or, oIdx) => ({ or, oIdx }))
-            .filter(({ or }) => {
-              const targetRDay = or.day || (currentDay !== '全部' ? currentDay : '')
-              if (currentRDay && targetRDay) {
-                return currentRDay === targetRDay
-              }
-              return true
-            })
-
-          const otherRoutesOptions = sameDayRoutes
-            .map(({ or, oIdx }) => {
-              const oTitle = or.day && or.day_route_idx !== undefined ? `${or.day} 路线 ${or.day_route_idx + 1}` : `路线 ${oIdx + 1}`
-              return `<option value="${oIdx}" ${oIdx === rIdx ? 'disabled' : ''}>${oTitle} (${or.vehicle_name || or.truck_name || '货车'})</option>`
-            })
-            .join('')
-
           marker.on('click', () => {
+            // Lazy evaluation: only compute sameDayRoutes dropdown options on click
+            const currentRDay = r.day || (currentDay !== '全部' ? currentDay : '')
+            const sameDayRoutes = routes
+              .map((or, oIdx) => ({ or, oIdx }))
+              .filter(({ or }) => {
+                const targetRDay = or.day || (currentDay !== '全部' ? currentDay : '')
+                if (currentRDay && targetRDay) {
+                  return currentRDay === targetRDay
+                }
+                return true
+              })
+
+            const otherRoutesOptions = sameDayRoutes
+              .map(({ or, oIdx }) => {
+                const oTitle = or.day && or.day_route_idx !== undefined ? `${or.day} 路线 ${or.day_route_idx + 1}` : `路线 ${oIdx + 1}`
+                return `<option value="${oIdx}" ${oIdx === rIdx ? 'disabled' : ''}>${oTitle} (${or.vehicle_name || or.truck_name || '货车'})</option>`
+              })
+              .join('')
+
             const dayLabel = currentRDay ? ` (${currentRDay})` : ''
             const safeName = escapeHtml(p.name || '门店')
             const infoContent = `
@@ -303,7 +315,7 @@ export function useRouteMapRenderer() {
           routeMarkers.push({ marker, dotNormal, dotHighlight })
         })
 
-        routeOverlays.push({ polyline: polyPath, markers: routeMarkers })
+        routeOverlays.push({ polyline, markers: routeMarkers })
       })
     }
 
