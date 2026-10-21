@@ -2,7 +2,7 @@ from typing import List, Dict, Set
 
 import numpy as np
 
-from app.models.truck import BaseTruck
+from app.models.vehicle import BaseTruck
 from app.utils.logger import LogUtil
 
 logger = LogUtil.get_logger(__name__)

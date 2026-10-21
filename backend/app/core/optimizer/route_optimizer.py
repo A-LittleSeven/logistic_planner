@@ -1,7 +1,7 @@
 from typing import List
 
 from app.models.store import StoreNode
-from app.models.truck import BaseTruck
+from app.models.vehicle import BaseTruck
 from app.utils.distance import haversine
 from app.utils.logger import LogUtil
 
