@@ -5,6 +5,25 @@ import { DAYS_LIST, getDistanceBetweenCoords } from '../../../utils/constants.js
 import { useRouteOptimizer } from '../../../composables/useRouteOptimizer.js'
 import { useRouteExport } from '../../../composables/useRouteExport.js'
 
+/**
+ * 解包并规范化排班数据，避免 schedule_results 属性多层嵌套导致的结构损坏
+ */
+function unwrapScheduleData(data) {
+  if (!data || typeof data !== 'object') return null
+  let current = data
+  // 递归解开潜在的嵌套包装：{ schedule_results: { schedule_results: ... } }
+  while (
+    current &&
+    typeof current === 'object' &&
+    'schedule_results' in current &&
+    !('points' in current) &&
+    !('daily_stats' in current)
+  ) {
+    current = current.schedule_results
+  }
+  return current && Object.keys(current).length > 0 ? current : null
+}
+
 export function useCanvasVersioning(state, options = {}) {
   const { onSnapshotLoaded } = options
   const { hydrateRoutePoints } = useRouteOptimizer()
@@ -127,11 +146,7 @@ export function useCanvasVersioning(state, options = {}) {
       }
     }
 
-    if (snapshot.schedule_data) {
-      scheduleResult.value = snapshot.schedule_data
-    } else {
-      scheduleResult.value = null
-    }
+    scheduleResult.value = unwrapScheduleData(snapshot.schedule_data)
 
     if (snapshot.routing_data) {
       if (snapshot.routing_data.daily_results) {
@@ -254,9 +269,7 @@ export function useCanvasVersioning(state, options = {}) {
           minZoneSize: minZoneSize.value,
           maxZoneSize: maxZoneSize.value,
         },
-        schedule_data: {
-          schedule_results: scheduleResult.value || {},
-        },
+        schedule_data: unwrapScheduleData(scheduleResult.value),
         routing_data: {
           daily_results: cleanDailyResults,
           trucks: trucks.value,
