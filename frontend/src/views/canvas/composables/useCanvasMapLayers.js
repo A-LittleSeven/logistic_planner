@@ -17,6 +17,7 @@ export function useCanvasMapLayers(state) {
     activeDayPoints,
     currentDisplayRoutes,
     highlightedRouteIdx,
+    highlightedClusterId,
     selectedPointIndices,
     isSelecting,
     mapPanelRef,
@@ -133,9 +134,13 @@ export function useCanvasMapLayers(state) {
   }
 
   const renderClusteringMap = (A) => {
+    const isAnyClusterHl = highlightedClusterId?.value !== null && highlightedClusterId?.value !== undefined
+    const hlClusterOverlays = []
+
     stores.value.forEach((p, i) => {
       if (!p.lng || !p.lat) return
       const cid = p.cluster_id
+      const isThisClusterHl = isAnyClusterHl && Number(highlightedClusterId.value) === Number(cid)
       const color = (cid !== undefined && cid !== null)
         ? CLUSTER_COLORS[cid % CLUSTER_COLORS.length]
         : '#94a3b8'
@@ -143,7 +148,7 @@ export function useCanvasMapLayers(state) {
       const { content, offset } = dotHtml({
         text: String(i + 1),
         color,
-        size: 22,
+        size: isThisClusterHl ? 26 : 22,
       })
 
       const marker = new A.Marker({
@@ -151,8 +156,13 @@ export function useCanvasMapLayers(state) {
         content,
         offset: new A.Pixel(offset[0], offset[1]),
         title: p.name || `门店${i + 1}`,
-        zIndex: 100,
+        zIndex: isThisClusterHl ? 150 : (isAnyClusterHl ? 80 : 100),
+        opacity: isAnyClusterHl ? (isThisClusterHl ? 1.0 : 0.25) : 1.0,
       })
+
+      if (isThisClusterHl) {
+        hlClusterOverlays.push(marker)
+      }
 
       let clusterSelectHtml = ''
       if (clusteringResult.value?.clusters?.length) {
@@ -212,20 +222,26 @@ export function useCanvasMapLayers(state) {
     if (clusteringResult.value?.clusters?.length) {
       clusteringResult.value.clusters.forEach((c) => {
         if (!c.center?.lng || !c.center?.lat) return
+        const isThisCenterHl = isAnyClusterHl && Number(highlightedClusterId.value) === Number(c.cluster_id)
         const color = CLUSTER_COLORS[c.cluster_id % CLUSTER_COLORS.length]
         const { content, offset } = dotHtml({
           text: `C${c.cluster_id + 1}`,
           color,
-          size: 32,
+          size: isThisCenterHl ? 36 : 32,
         })
 
         const centerMarker = new A.Marker({
           position: [Number(c.center.lng), Number(c.center.lat)],
           content,
           offset: new A.Pixel(offset[0], offset[1]),
-          zIndex: 200,
+          zIndex: isThisCenterHl ? 260 : 200,
+          opacity: isAnyClusterHl ? (isThisCenterHl ? 1.0 : 0.35) : 1.0,
           title: `店群 ${c.cluster_id + 1} 中心`,
         })
+
+        if (isThisCenterHl) {
+          hlClusterOverlays.push(centerMarker)
+        }
 
         const centerContent = `
           <div style="padding: 10px 14px; font-size: 13px; line-height: 1.6; color: #1e293b; min-width: 170px; background: white; border-radius: 8px;">
@@ -250,6 +266,13 @@ export function useCanvasMapLayers(state) {
 
         mapPanelRef.value.addOverlay(centerMarker)
       })
+    }
+
+    if (isAnyClusterHl && hlClusterOverlays.length) {
+      const mapObj = mapPanelRef.value?.getMap ? mapPanelRef.value.getMap() : amapInstance.value
+      if (mapObj) {
+        mapObj.setFitView(hlClusterOverlays, false, [60, 60, 60, 60])
+      }
     }
   }
 

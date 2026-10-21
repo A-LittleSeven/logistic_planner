@@ -249,9 +249,7 @@ const {
   hasRoutingComputed,
   mapPanelRef,
   amapInstance,
-  recalculateClusterMetrics,
-  invalidateDownstreamStagesFromClustering,
-  invalidateDownstreamStagesFromScheduling,
+  highlightedClusterId,
   handleToggleStoreExpress,
   handleBatchSetStoresExpress,
   moveStoreBetweenRoutes,
@@ -303,6 +301,7 @@ const formatTimeShort = (timeStr) => {
 
 const switchStage = (stage) => {
   activeStage.value = stage
+  highlightedClusterId.value = null
   renderMap(true)
 }
 

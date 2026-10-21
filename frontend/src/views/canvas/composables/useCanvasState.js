@@ -78,6 +78,7 @@ export function provideCanvasState(canvasId) {
   const selectedPointIndices = ref([])
   const expandedRouteIndices = ref(new Set())
   const highlightedRouteIdx = ref(null)
+  const highlightedClusterId = ref(null)
 
   // 5. Computeds
   const totalLoads = computed(() => {
@@ -216,6 +217,7 @@ export function provideCanvasState(canvasId) {
     isRoutingOutdated.value = true
     scheduleResult.value = null
     selectedScheduleDay.value = '周一'
+    highlightedClusterId.value = null
 
     dailyResults.value = {}
     selectedRoutingDay.value = '周一'
@@ -418,6 +420,7 @@ export function provideCanvasState(canvasId) {
     selectedPointIndices,
     expandedRouteIndices,
     highlightedRouteIdx,
+    highlightedClusterId,
     // Computeds
     totalLoads,
     activeScheduleStores,

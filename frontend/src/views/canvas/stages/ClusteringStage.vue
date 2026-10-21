@@ -93,7 +93,9 @@
       <ClusterResultList
         :clusters="clusteringResult.clusters"
         :stores="stores"
+        :highlighted-cluster-id="highlightedClusterId"
         :get-cluster-color="getClusterColor"
+        @toggle-highlight="handleToggleHighlightCluster"
       />
     </div>
   </div>
@@ -120,6 +122,7 @@ const {
   maxZoneSize,
   isSelecting,
   selectedPointIndices,
+  highlightedClusterId,
   recalculateClusterMetrics,
   invalidateDownstreamStagesFromClustering,
 } = useCanvasState()
@@ -128,6 +131,15 @@ const clusteringLoading = ref(false)
 const batchTargetCluster = ref('')
 
 const getClusterColor = (cId) => CLUSTER_COLORS[(cId || 0) % CLUSTER_COLORS.length]
+
+const handleToggleHighlightCluster = (clusterId) => {
+  if (highlightedClusterId.value === clusterId) {
+    highlightedClusterId.value = null
+  } else {
+    highlightedClusterId.value = clusterId
+  }
+  emit('render-map')
+}
 
 const handleRunClustering = async () => {
   if (stores.value.length < 2) {
