@@ -157,8 +157,8 @@ def _build_route_results(
 
 def plan_daily_routes_with_or(
         stores: Sequence[Union[StoreNode, dict[str, Any]]],
-        warehouse_lat: float,
         warehouse_lon: float,
+        warehouse_lat: float,
         trucks: Optional[Sequence[Union[dict[str, Any], Any]]] = None,
         max_truck_capacity_rate: float = 1.1,
         time_limit_seconds: int = 60,

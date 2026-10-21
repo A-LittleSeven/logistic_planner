@@ -25,7 +25,7 @@ def solve_center_of_gravity(req: LocationSolveRequest, provider: DistanceProvide
 
     # 总加权距离 (用所选距离提供者)
     twd = sum(
-        p.weight * provider.distance_km(center, (p.lng, p.lat)) for p in req.points
+        p.weight * provider.distance(center_lng, center_lat, p.lng, p.lat) for p in req.points
     )
 
     return {

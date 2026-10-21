@@ -1,21 +1,22 @@
 export const DAYS_LIST = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
-export const formatDuration = (secondsOrMinutes) => {
-  if (!secondsOrMinutes) return '0分钟'
-  const val = Number(secondsOrMinutes)
-  if (isNaN(val)) return '0分钟'
-  
-  let hours, minutes
-  if (val > 1000) {
-    hours = Math.floor(val / 3600)
-    minutes = Math.floor((val % 3600) / 60)
-  } else {
-    hours = Math.floor(val / 60)
-    minutes = Math.floor(val % 60)
+export const formatDuration = (seconds, unit = 's') => {
+  if (!seconds || seconds <= 0) return '0分钟'
+  const num = Number(seconds)
+  if (isNaN(num)) return '0分钟'
+
+  const totalSeconds = unit === 'm' ? Math.round(num * 60) : Math.round(num)
+  const totalMinutes = Math.round(totalSeconds / 60)
+
+  if (totalMinutes <= 0) {
+    return '1分钟'
   }
-  
+
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+
   if (hours > 0) {
-    return `${hours}小时${minutes}分钟`
+    return minutes > 0 ? `${hours}小时${minutes}分钟` : `${hours}小时`
   }
   return `${minutes}分钟`
 }

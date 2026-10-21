@@ -200,6 +200,7 @@ class TruckSchedule(object):
         核心装载逻辑：支持分层过滤、距离保护、同车去重。
         """
         while truck.truck_current_load < truck.max_capacity * self.max_truck_capacity_rate:
+            target_store = None
             # 当前门店
             current_node = truck.truck_trace[-1]
 
@@ -243,6 +244,8 @@ class TruckSchedule(object):
                         break
                     if best_e_store:
                         current_node = best_e_store
+                else:
+                    break
             else:
                 target_store = abs_nearest
 

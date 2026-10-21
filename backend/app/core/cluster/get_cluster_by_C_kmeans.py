@@ -26,13 +26,19 @@ class getClusterByConstrainedKmeans(BaseCluster):
         self.delivery_freq = None
 
     def _get_min_cluster_size(self, cluster_delivery_freq):
-        """根据配送频率确定最小聚类规模"""
+        """根据配送频率与总体样本规模自适应确定最小聚类规模"""
+        total_samples = len(self.data) if hasattr(self, 'data') and self.data is not None else 100
+        avg_cluster_size = max(1, total_samples // max(1, self.n_clusters))
+
+        # 基础规模取平均簇规模的 40%，且不超过 13
+        base_min = max(1, min(13, int(avg_cluster_size * 0.4)))
+
         if len(cluster_delivery_freq) > 0:
             max_freq = np.max(cluster_delivery_freq)
-            min_size = max_freq * 13
+            min_size = min(int(avg_cluster_size * 0.8), max(base_min, int(max_freq * 2)))
         else:
-            min_size = 13
-        return min_size
+            min_size = base_min
+        return max(1, min_size)
 
     def _init_centers(self, X):
         """改进的初始化：考虑空间分布和约束"""
@@ -86,7 +92,7 @@ class getClusterByConstrainedKmeans(BaseCluster):
             cluster_indices = np.where(labels == cluster_id)[0]
 
             if len(cluster_indices) == 0:
-                violations.append((cluster_id, 13, 'empty'))
+                violations.append((cluster_id, self._get_min_cluster_size([]), 'empty'))
                 continue
 
             cluster_freq = delivery_freq[cluster_indices]
@@ -102,8 +108,6 @@ class getClusterByConstrainedKmeans(BaseCluster):
 
     def _add_points_to_cluster_strong(self, X, labels, target_cluster, n_points_needed, distances, delivery_freq):
         """强化版：添加点到满足最小规模约束"""
-        n_samples = X.shape[0]
-
         other_cluster_points = np.where(labels != target_cluster)[0]
         if len(other_cluster_points) == 0:
             return
@@ -119,10 +123,10 @@ class getClusterByConstrainedKmeans(BaseCluster):
             original_cluster = labels[point_idx]
             original_cluster_indices = np.where(labels == original_cluster)[0]
 
-            if len(original_cluster_indices) > 13:
-                original_cluster_freq = delivery_freq[original_cluster_indices]
-                original_min_size = self._get_min_cluster_size(original_cluster_freq)
+            original_cluster_freq = delivery_freq[original_cluster_indices]
+            original_min_size = self._get_min_cluster_size(original_cluster_freq)
 
+            if len(original_cluster_indices) > original_min_size:
                 new_original_size = len(original_cluster_indices) - 1
                 if new_original_size >= original_min_size:
                     labels[point_idx] = target_cluster
@@ -173,33 +177,36 @@ class getClusterByConstrainedKmeans(BaseCluster):
     def _local_search_optimization(self, X, labels, delivery_freq, max_iterations=100):
         """启发式局部搜索优化类内距离"""
         n_samples = X.shape[0]
+        current_labels = labels.copy()
         best_labels = labels.copy()
         best_total_distance = self._calculate_total_distance(X, best_labels)
-
-        distances = cdist(X, X, metric='euclidean')
 
         for iteration in range(max_iterations):
             improved = False
 
             for point_idx in np.random.permutation(n_samples):
-                current_cluster = labels[point_idx]
-                original_labels = labels.copy()
+                original_cluster = current_labels[point_idx]
+                best_point_cluster = original_cluster
+                best_point_dist = best_total_distance
 
                 for target_cluster in range(self.n_clusters):
-                    if target_cluster == current_cluster:
+                    if target_cluster == original_cluster:
                         continue
-                    labels[point_idx] = target_cluster
-                    if self._check_constraints_satisfied(labels, delivery_freq):
-                        new_total_distance = self._calculate_total_distance(X, labels)
-                        if new_total_distance < best_total_distance:
-                            best_labels = labels.copy()
-                            best_total_distance = new_total_distance
-                            improved = True
-                            break
-                    else:
-                        labels[point_idx] = current_cluster
+                    current_labels[point_idx] = target_cluster
+                    if self._check_constraints_satisfied(current_labels, delivery_freq):
+                        new_total_distance = self._calculate_total_distance(X, current_labels)
+                        if new_total_distance < best_point_dist:
+                            best_point_dist = new_total_distance
+                            best_point_cluster = target_cluster
 
-                labels[:] = original_labels
+                if best_point_cluster != original_cluster:
+                    current_labels[point_idx] = best_point_cluster
+                    best_total_distance = best_point_dist
+                    best_labels = current_labels.copy()
+                    improved = True
+                else:
+                    current_labels[point_idx] = original_cluster
+
             if not improved:
                 break
         return best_labels
