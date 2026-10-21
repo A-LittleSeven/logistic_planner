@@ -23,10 +23,10 @@ def __getattr__(name: str):
         from app.core.cluster.get_cluster_by_district_extension import ClusterByDistrictExtension
         return ClusterByDistrictExtension
     if name == "LogUtil":
-        from app.core.utils.logutils import LogUtil
+        from app.utils.logger import LogUtil
         return LogUtil
     if name == "RouteOptimizer":
-        from app.core.utils.route_optimizer import RouteOptimizer
+        from app.core.optimizer.route_optimizer import RouteOptimizer
         return RouteOptimizer
     if name == "TruckSchedule":
         from app.core.optimizer.truck_schedule import TruckSchedule

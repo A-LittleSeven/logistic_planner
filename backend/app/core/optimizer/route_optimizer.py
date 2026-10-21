@@ -3,7 +3,7 @@ from typing import List
 from app.models.store import StoreNode
 from app.models.truck import BaseTruck
 from app.utils.distance import haversine
-from app.core.utils.logutils import LogUtil
+from app.utils.logger import LogUtil
 
 logger = LogUtil.get_logger(__name__)
 

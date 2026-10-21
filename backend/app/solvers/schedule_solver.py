@@ -7,7 +7,7 @@ from app.models.clustering import ScheduleSolveRequest
 from app.models.cluster import ClusterNode
 from app.models.store import StoreNode
 from app.core.optimizer.truck_schedule import TruckSchedule
-from app.core.utils.route_optimizer import RouteOptimizer
+from app.core.optimizer.route_optimizer import RouteOptimizer
 from app.core.optimizer.working_schedule import working_schedule, balance_schedule
 from app.utils.distance import haversine
 from app.utils.registry import schedule_registry

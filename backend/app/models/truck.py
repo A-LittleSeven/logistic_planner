@@ -1,6 +1,6 @@
 from typing import Optional, Type
 from pydantic import BaseModel, Field
-from app.core.utils.logutils import LogUtil
+from app.utils.logger import LogUtil
 
 
 logger = LogUtil.get_logger(__name__)

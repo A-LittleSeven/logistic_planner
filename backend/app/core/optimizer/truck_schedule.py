@@ -3,8 +3,8 @@ from typing import List, Optional, Dict, Set, cast
 from app.models.cluster import ClusterNode
 from app.models.store import StoreNode
 from app.models.truck import Truck420, BaseTruck
-from app.core.utils.logutils import LogUtil
-from app.core.utils.route_optimizer import RouteOptimizer
+from app.utils.logger import LogUtil
+from app.core.optimizer.route_optimizer import RouteOptimizer
 
 logger = LogUtil.get_logger(__name__)
 
