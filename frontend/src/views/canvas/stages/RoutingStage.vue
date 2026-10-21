@@ -11,7 +11,6 @@
       <div class="form-group">
         <label class="form-label">计划配送作业日</label>
         <el-select v-model="selectedRoutingDay" style="width: 100%;" @change="$emit('render-map')">
-          <el-option label="全部时间 (全周总览)" value="全部" />
           <el-option label="周一配送路线" value="周一" />
           <el-option label="周二配送路线" value="周二" />
           <el-option label="周三配送路线" value="周三" />
@@ -19,6 +18,7 @@
           <el-option label="周五配送路线" value="周五" />
           <el-option label="周六配送路线" value="周六" />
           <el-option label="周日配送路线" value="周日" />
+          <el-option label="全部时间 (全周总览)" value="全部" />
         </el-select>
       </div>
     </div>
@@ -62,14 +62,14 @@
     </div>
 
     <div class="panel-card">
-      <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+      <div style="display: flex; gap: 8px; margin-bottom: 6px;">
         <el-button
           type="primary"
           style="flex: 1;"
           :loading="routingLoading"
           @click="handleRunRouting"
         >
-          {{ routingLoading ? '路径规划计算中…' : '⚡ 执行智能路线规划' }}
+          {{ routingLoading ? '路径规划计算中…' : (selectedRoutingDay === '全部' ? '⚡ 执行全周多日智能路线规划' : `⚡ 执行「${selectedRoutingDay}」智能路线规划`) }}
         </el-button>
         <el-button
           plain
@@ -78,6 +78,18 @@
           style="padding: 0 12px; font-size: 14px;"
         >
           ⚙️
+        </el-button>
+      </div>
+      <div v-if="selectedRoutingDay !== '全部'" style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+        <el-button
+          link
+          type="primary"
+          size="small"
+          :loading="routingLoading"
+          style="font-size: 11px; padding: 0;"
+          @click="handleRunAllWeekRouting"
+        >
+          ⚡ 一键规划全周所有作业日 (7天)
         </el-button>
       </div>
       <el-button
@@ -384,6 +396,13 @@ const handleRunRouting = async () => {
   } finally {
     routingLoading.value = false
   }
+}
+
+const handleRunAllWeekRouting = async () => {
+  selectedRoutingDay.value = '全部'
+  await handleRunRouting()
+  selectedRoutingDay.value = '周一'
+  emit('render-map', true)
 }
 
 const calculateSingleAmapRoute = async (targetRoute, idx) => {

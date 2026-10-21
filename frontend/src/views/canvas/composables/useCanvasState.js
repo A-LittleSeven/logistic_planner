@@ -1,4 +1,4 @@
-import { ref, reactive, computed, provide, inject } from 'vue'
+import { ref, shallowRef, reactive, computed, provide, inject } from 'vue'
 import { DAYS_LIST, getDistanceBetweenCoords } from '../../../utils/constants.js'
 import { useRouteOptimizer } from '../../../composables/useRouteOptimizer.js'
 import { ElMessage } from 'element-plus'
@@ -30,7 +30,7 @@ export function provideCanvasState(canvasId) {
   })
 
   const currentVersion = ref(null)
-  const versionList = ref([])
+  const versionList = shallowRef([])
   const activeStage = ref('clustering')
 
   // 2. Core Business Data
@@ -43,8 +43,8 @@ export function provideCanvasState(canvasId) {
   ])
 
   // Filters & State Flags
-  const selectedScheduleDay = ref('全部')
-  const selectedRoutingDay = ref('全部')
+  const selectedScheduleDay = ref('周一')
+  const selectedRoutingDay = ref('周一')
   const isScheduleOutdated = ref(false)
   const isRoutingOutdated = ref(false)
 
@@ -72,8 +72,8 @@ export function provideCanvasState(canvasId) {
   const routeOptions = ref({ ...defaultRouteOptions })
 
   // 4. Map & Box Selection Tool
-  const mapPanelRef = ref(null)
-  const amapInstance = ref(null)
+  const mapPanelRef = shallowRef(null)
+  const amapInstance = shallowRef(null)
   const isSelecting = ref(false)
   const selectedPointIndices = ref([])
   const expandedRouteIndices = ref(new Set())
@@ -128,7 +128,6 @@ export function provideCanvasState(canvasId) {
             day,
             day_route_idx: rIdx,
             route_title: `${day} 路线 ${rIdx + 1}`,
-            raw_route: r,
           })
         })
       }
@@ -140,7 +139,15 @@ export function provideCanvasState(canvasId) {
     if (selectedRoutingDay.value === '全部') {
       return allWeekRoutes.value
     }
-    return dailyResults.value[selectedRoutingDay.value]?.routes || []
+    const dayRoutes = dailyResults.value[selectedRoutingDay.value]?.routes
+    if (dayRoutes && dayRoutes.length) {
+      return dayRoutes
+    }
+    // Fallback: If legacy canvas only has dailyResults['全部'], fallback gracefully
+    if (dailyResults.value['全部']?.routes?.length && !Object.keys(dailyResults.value).some((k) => k !== '全部')) {
+      return dailyResults.value['全部'].routes
+    }
+    return dayRoutes || []
   })
 
   const routes = computed(() => currentDisplayRoutes.value)
@@ -208,10 +215,10 @@ export function provideCanvasState(canvasId) {
     isScheduleOutdated.value = true
     isRoutingOutdated.value = true
     scheduleResult.value = null
-    selectedScheduleDay.value = '全部'
+    selectedScheduleDay.value = '周一'
 
     dailyResults.value = {}
-    selectedRoutingDay.value = '全部'
+    selectedRoutingDay.value = '周一'
     highlightedRouteIdx.value = null
     expandedRouteIndices.value.clear()
 
@@ -222,7 +229,7 @@ export function provideCanvasState(canvasId) {
     isScheduleOutdated.value = false
     isRoutingOutdated.value = true
     dailyResults.value = {}
-    selectedRoutingDay.value = '全部'
+    selectedRoutingDay.value = '周一'
     highlightedRouteIdx.value = null
     expandedRouteIndices.value.clear()
 

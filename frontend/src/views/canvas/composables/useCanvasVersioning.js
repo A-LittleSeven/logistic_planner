@@ -31,6 +31,8 @@ export function useCanvasVersioning(state, options = {}) {
     routes,
     totalDistanceKm,
     allWeekRoutes,
+    selectedScheduleDay,
+    selectedRoutingDay,
   } = state
 
   const savingVersion = ref(false)
@@ -146,12 +148,23 @@ export function useCanvasVersioning(state, options = {}) {
           }
         })
         dailyResults.value = hydratedDaily
+        if (selectedRoutingDay) {
+          if (hydratedDaily['周一']?.routes?.length) {
+            selectedRoutingDay.value = '周一'
+          } else {
+            const firstDay = Object.keys(hydratedDaily).find((d) => hydratedDaily[d]?.routes?.length)
+            if (firstDay) {
+              selectedRoutingDay.value = firstDay
+            }
+          }
+        }
       } else if (snapshot.routing_data.routes?.length) {
         dailyResults.value = {
           '全部': {
             routes: hydrateRoutePoints(snapshot.routing_data.routes, stores.value, { defaultReturnToDepot: routeOptions.value?.return_to_depot }),
           },
         }
+        if (selectedRoutingDay) selectedRoutingDay.value = '全部'
       } else {
         dailyResults.value = {}
       }

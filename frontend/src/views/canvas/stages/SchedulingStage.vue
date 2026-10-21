@@ -28,7 +28,6 @@
       <div class="form-group">
         <label class="form-label">按配送作业日筛选查看</label>
         <el-select v-model="selectedScheduleDay" style="width: 100%;" @change="$emit('render-map')">
-          <el-option label="全部时间 (全周总览)" value="全部" />
           <el-option label="周一配送门店" value="周一" />
           <el-option label="周二配送门店" value="周二" />
           <el-option label="周三配送门店" value="周三" />
@@ -36,6 +35,7 @@
           <el-option label="周五配送门店" value="周五" />
           <el-option label="周六配送门店" value="周六" />
           <el-option label="周日配送门店" value="周日" />
+          <el-option label="全部时间 (全周总览)" value="全部" />
         </el-select>
       </div>
 
