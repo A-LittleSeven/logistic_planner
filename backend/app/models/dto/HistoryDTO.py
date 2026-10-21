@@ -1,3 +1,7 @@
+"""任务执行历史记录数据传输对象 (History DTO)。
+
+专职负责规划与求解任务历史查询、详情审计的 HTTP API 请求/响应模型。
+"""
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict

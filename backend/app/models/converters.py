@@ -4,7 +4,8 @@
 统一坐标字段映射 (lng/longitude/store_lon, lat/latitude/store_lat) 与默认值填充。
 """
 from typing import Any, Dict, List, Optional, Tuple, Union
-from app.models.store import StoreNode, StoreBase
+from app.models.do.StoreDO import StoreNode
+from app.models.dto.StoreDTO import StoreBase
 from app.utils.distance import haversine
 
 

@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
 from app.db.models import DBStore, DBDepot, DBVehicle
-from app.models.store import StoreCreate, StoreUpdate, BatchImportRequest
-from app.models.depot import DepotCreate, DepotUpdate
-from app.models.vehicle import VehicleCreate, VehicleUpdate
+from app.models.dto.StoreDTO import StoreCreate, StoreUpdate, BatchImportRequest
+from app.models.dto.DepotDTO import DepotCreate, DepotUpdate
+from app.models.dto.VehicleDTO import VehicleCreate, VehicleUpdate
 from app.utils.logger import LogUtil
 
 logger = LogUtil.get_logger(__name__)

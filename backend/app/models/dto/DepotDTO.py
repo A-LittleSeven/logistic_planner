@@ -1,3 +1,7 @@
+"""仓库/起点管理数据传输对象 (Depot DTO)。
+
+专职负责 DC 中心仓主数据 CRUD 的 HTTP 请求入参校验与响应序列化。
+"""
 from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
 

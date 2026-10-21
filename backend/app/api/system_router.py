@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.db.models import DBSystemSetting
-from app.models.system import (
+from app.models.dto.SystemDTO import (
     AMapConfigRequest,
     AMapConfigResponse,
 )

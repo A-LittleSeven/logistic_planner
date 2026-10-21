@@ -14,12 +14,12 @@ from app.utils.distance import DistanceProvider
 from app.db.models import DBTaskHistory
 from app.utils.serialization import safe_json_dumps
 from app.utils.logger import LogUtil
-from app.models.routing import (
+from app.models.dto.RoutingDTO import (
     RoutingSolveRequest,
     GlobalRoutingSolveRequest,
     SaveRoutingPlanRequest,
 )
-from app.models.clustering import (
+from app.models.dto.ClusteringDTO import (
     ClusteringSolveRequest,
     ScheduleSolveRequest,
     SaveClusterPlanRequest,
@@ -228,11 +228,17 @@ class PlanExecutionService:
             raise HTTPException(status_code=400, detail=str(e))
 
         task_id = str(uuid.uuid4())
-        param_json = (
-            req.model_dump_json()
-            if hasattr(req, "model_dump_json")
-            else json.dumps(req.dict())
-        )
+        param_json = safe_json_dumps(req)
+
+        # 尝试从数据库加载启用的车型主数据，动态打通排班运力池
+        try:
+            from app.db.models import DBVehicle
+            from app.models.do.VehicleDO import load_fleet_classes
+            active_vehicles = db.query(DBVehicle).filter(DBVehicle.is_active == True).all()
+            if active_vehicles and "_fleet_classes" not in req.options:
+                req.options["_fleet_classes"] = load_fleet_classes(active_vehicles)
+        except Exception as e:
+            logger.warning(f"加载数据库动态车型失败，自动降级为内置静态车型: {e}")
         try:
             resp_data = solver(req)
             cls._record_task_history(

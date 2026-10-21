@@ -10,7 +10,7 @@ from app.core import get_distance_provider
 from app.utils.distance import DistanceProvider
 from app.core import clustering_registry, schedule_registry
 from app.core.database import get_db
-from app.models.clustering import (
+from app.models.dto.ClusteringDTO import (
     ClusteringSolveRequest,
     ClusteringSolveResponse,
     ScheduleSolveRequest,

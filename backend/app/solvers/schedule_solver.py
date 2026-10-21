@@ -3,9 +3,9 @@
 支持通过 schedule_registry 灵活拓展多种排班方法 (例如: 店群负载均衡排班、频次平滑排班等)。
 """
 from typing import Dict, Any, List
-from app.models.clustering import ScheduleSolveRequest
-from app.models.cluster import ClusterNode
-from app.models.store import StoreNode
+from app.models.dto.ClusteringDTO import ScheduleSolveRequest
+from app.models.do.ClusterDO import ClusterNode
+from app.models.do.StoreDO import StoreNode
 from app.core.optimizer.truck_schedule import TruckSchedule
 from app.core.optimizer.route_optimizer import RouteOptimizer
 from app.core.optimizer.working_schedule import working_schedule, balance_schedule
@@ -51,7 +51,7 @@ def solve_cluster_balanced_schedule(req: ScheduleSolveRequest) -> Dict[str, Any]
         )
         cluster_list.append(cluster)
 
-    # 4. 执行排班策略
+    # 4. 执行排班策略与运力调度
     options = req.options or {}
     max_rate = float(options.get("max_truck_capacity_rate", 0.96))
     n_neighbor = int(options.get("search_n_neighbor", 1))
@@ -60,6 +60,11 @@ def solve_cluster_balanced_schedule(req: ScheduleSolveRequest) -> Dict[str, Any]
     dist_thres = float(options.get("dist_thres", 0.9))
     one_way_dist_max = int(options.get("one_way_dist_max", 40))
     work_days = int(options.get("work_days", 6))
+    fleet_classes = options.get("_fleet_classes") or options.get("truck_classes")
+
+    # 上下文隔离的 ID 重置（并发安全）
+    from app.models.do.VehicleDO import TruckIdAllocator
+    TruckIdAllocator.reset(1)
 
     sorted_cluster = sorted(cluster_list, key=lambda x: x.cdist_warehouse)
     scheduler = TruckSchedule(
@@ -68,7 +73,8 @@ def solve_cluster_balanced_schedule(req: ScheduleSolveRequest) -> Dict[str, Any]
         simple_mode_thres=simple_thres,
         dist_thres=dist_thres,
         one_way_dist_max=one_way_dist_max,
-        detour_thres=detour_thres
+        detour_thres=detour_thres,
+        truck_classes=fleet_classes,
     )
 
     if sorted_cluster:

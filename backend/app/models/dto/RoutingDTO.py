@@ -1,4 +1,7 @@
-"""物流路线规划 (TSP/VRP) 的请求/响应模型。"""
+"""物流路线规划数据传输对象 (Routing DTO)。
+
+专职负责 TSP/CVRP 路线求解、多日全局路径规划与方案持久化的 HTTP API 请求/响应模型。
+"""
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
 

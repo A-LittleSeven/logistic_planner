@@ -1,3 +1,7 @@
+"""店群规划与排班数据传输对象 (Clustering DTO)。
+
+专职负责店群划分、全周排班均衡与方案存盘的 HTTP API 请求/响应模型。
+"""
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 
@@ -80,7 +84,6 @@ class ScheduleSolveRequest(BaseModel):
 
 class ScheduleSolveResponse(BaseModel):
     points: List[dict]
-
 
 
 class SaveClusterPlanRequest(BaseModel):

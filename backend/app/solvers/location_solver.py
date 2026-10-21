@@ -7,7 +7,7 @@ import numpy as np
 
 from app.utils.distance import DistanceProvider
 from app.core import location_registry
-from app.models.location import LocationSolveRequest
+from app.models.dto.LocationDTO import LocationSolveRequest
 
 
 def solve_center_of_gravity(req: LocationSolveRequest, provider: DistanceProvider) -> dict:

@@ -6,7 +6,7 @@ from sqlalchemy import desc, func
 from fastapi import HTTPException
 
 from app.db.models import DBCanvas, DBCanvasVersion
-from app.models.canvas_schema import (
+from app.models.dto.CanvasDTO import (
     CanvasCreate,
     CanvasUpdate,
     CanvasVersionCreate,

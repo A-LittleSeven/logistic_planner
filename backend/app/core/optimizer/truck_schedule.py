@@ -1,8 +1,8 @@
-from typing import List, Optional, Dict, Set, cast
+from typing import List, Optional, Dict, Set, Type, cast
 
-from app.models.cluster import ClusterNode
-from app.models.store import StoreNode
-from app.models.vehicle import Truck420, BaseTruck
+from app.models.do.ClusterDO import ClusterNode
+from app.models.do.StoreDO import StoreNode
+from app.models.do.VehicleDO import Truck420, BaseTruck, Express
 from app.utils.logger import LogUtil
 from app.core.optimizer.route_optimizer import RouteOptimizer
 
@@ -20,7 +20,9 @@ class TruckSchedule(object):
                  simple_mode_thres: int = 2,
                  dist_thres: float = 0.9,
                  one_way_dist_max: int = 40,
-                 detour_thres: float = 40):
+                 detour_thres: float = 40,
+                 truck_classes: Optional[List[Type[BaseTruck]]] = None,
+                 default_truck_cls: Optional[Type[BaseTruck]] = None):
         # 局部搜索邻居数量
         self.search_n_neighbor = search_n_neighbor
         # 直接规划模式阈值
@@ -33,6 +35,15 @@ class TruckSchedule(object):
         self.max_truck_capacity_rate = max_truck_capacity_rate
         self.plan_trucks: List[BaseTruck] = []
         self._cluster_store_snapshot: Dict[int, List[StoreNode]] = {}
+
+        # 动态车型池与默认基准车型
+        self.truck_classes: List[Type[BaseTruck]] = list(truck_classes) if truck_classes else list(BaseTruck.supported_truck_classes())
+        if default_truck_cls is not None:
+            self.default_truck_cls = default_truck_cls
+        else:
+            # 优先选择非 Express 的中等容量主力车型，缺省回退 Truck420
+            non_express = [c for c in self.truck_classes if not issubclass(c, Express) and c is not Express]
+            self.default_truck_cls = non_express[0] if non_express else (self.truck_classes[0] if self.truck_classes else Truck420)
 
     @staticmethod
     def _add_store_with_adaptation(truck: BaseTruck, store: StoreNode):
@@ -149,7 +160,7 @@ class TruckSchedule(object):
             seed_store = self._pick_seed_store(active_stores, is_simple_mode)
             if not seed_store: break
 
-            truck = Truck420()
+            truck = self.default_truck_cls()
             # 设定本埠外埠卡车
             if truck.is_homepot is None:
                 truck.is_homepot = seed_store.is_homepot

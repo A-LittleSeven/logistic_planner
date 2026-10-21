@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.history import (
+from app.models.dto.HistoryDTO import (
     TaskHistoryCreate,
     TaskHistoryResponse,
 )

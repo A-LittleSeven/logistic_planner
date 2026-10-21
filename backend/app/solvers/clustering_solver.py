@@ -2,7 +2,7 @@ import pandas as pd
 
 from app.utils.distance import DistanceProvider, haversine
 from app.core import clustering_registry
-from app.models.clustering import ClusteringSolveRequest
+from app.models.dto.ClusteringDTO import ClusteringSolveRequest
 
 
 def solve_clustering(req: ClusteringSolveRequest, provider: DistanceProvider) -> dict:

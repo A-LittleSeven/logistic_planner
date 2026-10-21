@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.canvas_schema import (
+from app.models.dto.CanvasDTO import (
     CanvasCreate,
     CanvasUpdate,
     CanvasVersionCreate,

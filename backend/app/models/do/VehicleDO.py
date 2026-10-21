@@ -1,49 +1,19 @@
+"""车辆/卡车算法领域模型对象 (Vehicle DO / BaseTruck)。
+
+专职用于排班调度、装载运筹计算与路径规划的运行时实体。
+维护单车装载状态、运行轨迹、动态容量限制与车型自动升降级机制。
+"""
+import contextvars
+import threading
 from typing import Optional, Type, List, Set, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, create_model
 from app.utils.logger import LogUtil
 
 logger = LogUtil.get_logger(__name__)
 
-
-# ==========================================
-# 1. 传输层 DTO / Schemas (API 请求与响应校验)
-# ==========================================
-
-class VehicleBase(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    vehicle_code: str = Field(..., description="车型编码")
-    name: str = Field(..., description="车型名称")
-    capacity_weight: float = Field(..., description="载重 (吨/箱)")
-    capacity_volume: float = Field(..., description="体积 (m³)")
-    cost_per_km: float = Field(..., description="每公里运输成本")
-    max_distance: Optional[float] = Field(500.0, description="最大单次行驶里程(km)")
-    available_count: Optional[int] = Field(10, description="可用车辆数量")
-    is_active: Optional[bool] = Field(True, description="是否启用")
-
-
-class VehicleCreate(VehicleBase):
-    pass
-
-
-class VehicleUpdate(BaseModel):
-    vehicle_code: Optional[str] = None
-    name: Optional[str] = None
-    capacity_weight: Optional[float] = None
-    capacity_volume: Optional[float] = None
-    cost_per_km: Optional[float] = None
-    max_distance: Optional[float] = None
-    available_count: Optional[int] = None
-    is_active: Optional[bool] = None
-
-
-class VehicleResponse(VehicleBase):
-    id: int
-
-
-# ==========================================
-# 2. 领域/算法层模型 (Domain / Solver Entity)
-# ==========================================
+# 协程/上下文局部 ID 计数器，消除多任务并发规划时的全局竞态
+_truck_id_counter_ctx: contextvars.ContextVar[int] = contextvars.ContextVar('truck_id_counter', default=1)
+_allocator_lock = threading.Lock()
 
 # 车型别名映射表，集中管理便于维护
 TRUCK_ALIAS_MAP: Dict[str, Type['VehicleNode']] = {}
@@ -56,18 +26,26 @@ def _register_aliases(truck_cls: Type['VehicleNode'], aliases: List[str]):
 
 
 class TruckIdAllocator:
-    """独立 ID 分配器，避免可变 ClassVar 与 Pydantic 模型冲突"""
-    _counter: int = 1
+    """并发安全的车辆 ID 分配器。优先使用上下文变量隔离，消除多请求/任务并发冲突。"""
+    _global_counter: int = 1
 
     @classmethod
     def next_id(cls) -> int:
-        truck_id = cls._counter
-        cls._counter += 1
-        return truck_id
+        try:
+            val = _truck_id_counter_ctx.get()
+            _truck_id_counter_ctx.set(val + 1)
+            return val
+        except Exception:
+            with _allocator_lock:
+                tid = cls._global_counter
+                cls._global_counter += 1
+                return tid
 
     @classmethod
     def reset(cls, start: int = 1):
-        cls._counter = start
+        _truck_id_counter_ctx.set(start)
+        with _allocator_lock:
+            cls._global_counter = start
 
 
 class VehicleNode(BaseModel):
@@ -76,6 +54,9 @@ class VehicleNode(BaseModel):
     维护单车装载状态、运行轨迹与动态容量限制。
     """
     truck_id: Optional[int] = None
+    vehicle_code: Optional[str] = Field(None, title="车型编码")
+    name: Optional[str] = Field(None, title="车型名称")
+    cost_per_km: Optional[float] = Field(None, title="每公里运输成本")
     max_capacity: int = Field(..., title="车辆最大载重")
     soft_capacity: int = Field(20, title="车辆软载重")
     truck_current_load: float = Field(0, title="车辆当前载重")
@@ -86,6 +67,8 @@ class VehicleNode(BaseModel):
     truck_is_borrow: bool = Field(False, title="车辆是否需要跨区域配送")
     max_distance: float = Field(..., title="车辆可配送最大距离")
     truck_price: Optional[float] = Field(None, title="车辆运费")
+
+    _dynamic_truck_classes: List[Type['VehicleNode']] = []
 
     def __init__(self, **kwargs):
         allocate_truck_id = kwargs.pop('_allocate_truck_id', True)
@@ -118,8 +101,15 @@ class VehicleNode(BaseModel):
         self.truck_frequency_max = max(store.frequency for store in self.truck_trace)
 
     @classmethod
+    def set_supported_truck_classes(cls, classes: List[Type['VehicleNode']]):
+        """设置全局/上下文动态启用的车型列表"""
+        cls._dynamic_truck_classes = list(classes)
+
+    @classmethod
     def supported_truck_classes(cls):
-        """当前系统支持的车型，按默认选型优先级排列（默认优先 4.2m）"""
+        """当前系统支持的车型。若配置了动态车型则优先采用，否则回退至内置标准车型"""
+        if cls._dynamic_truck_classes:
+            return tuple(cls._dynamic_truck_classes)
         return Truck420, Truck270, Truck960, Express
 
     @staticmethod
@@ -142,7 +132,7 @@ class VehicleNode(BaseModel):
         lookup_key = str(truck_value).strip().upper().replace(' ', '')
         if not lookup_key:
             return None
-        
+
         # 1. 别名表匹配
         if lookup_key in TRUCK_ALIAS_MAP:
             return TRUCK_ALIAS_MAP[lookup_key]
@@ -332,3 +322,81 @@ _register_aliases(Truck420, ['TRUCK420', '420', '4.2', '4.2M', '4.2米', '4.2米
 _register_aliases(Truck420_1, ['TRUCK420_1', '420_1', '4.2宽体', '4.2米宽体', '4.2米宽体厢车'])
 _register_aliases(Truck960, ['TRUCK960', '960', '9.6', '9.6M', '9.6米', '9.6米厢车', '9.6米厢式货车', '9.6米货车', '9.6米车', '重卡', '9.6米大货车', '重型货车', '7.6米', '7.6米中型货车', '7.6米货车', '7.6米厢车'])
 _register_aliases(Express, ['EXPRESS', '快递', '快件', '快递物流', '物流', '第三方物流', '零担', '专线'])
+
+
+# ==========================================
+# 动态车型配置工厂与主数据加载器
+# ==========================================
+
+def create_vehicle_class(
+    vehicle_code: str,
+    name: str,
+    capacity: int,
+    max_distance: float = 1000.0,
+    cost_per_km: Optional[float] = None,
+    aliases: Optional[List[str]] = None,
+) -> Type[VehicleNode]:
+    """根据主数据或外部配置动态创建 VehicleNode 子类，并自动注册别名"""
+    clean_code = str(vehicle_code).replace(".", "_").replace("-", "_").replace(" ", "_").upper()
+    class_name = f"DynamicTruck_{clean_code}"
+
+    # 使用 Pydantic create_model 规范定义动态派生模型
+    dynamic_cls = create_model(
+        class_name,
+        __base__=BaseTruck,
+        max_capacity=(int, int(capacity)),
+        max_distance=(float, float(max_distance)),
+        vehicle_code=(Optional[str], str(vehicle_code)),
+        name=(Optional[str], str(name)),
+        cost_per_km=(Optional[float], float(cost_per_km) if cost_per_km is not None else None),
+    )
+    dynamic_cls.__doc__ = f"动态配置车型: {name} (编码: {vehicle_code}, 载重: {capacity})"
+
+    # 注册别名支持
+    reg_aliases = [vehicle_code, name, clean_code]
+    if aliases:
+        reg_aliases.extend(aliases)
+    _register_aliases(dynamic_cls, reg_aliases)
+    return dynamic_cls
+
+
+def load_fleet_classes(vehicles_data: Optional[List[Any]] = None) -> List[Type[VehicleNode]]:
+    """
+    根据给定的车型主数据（ORM 模型 DBVehicle、Pydantic DTO 或字典）动态构建排班可用车型池。
+    按载重规模合理排序，并附带兜底的快递车型。
+    若列表为空则回退返回内置静态车型池 (Truck420, Truck270, Truck960, Express)。
+    """
+    if not vehicles_data:
+        return list(VehicleNode.supported_truck_classes())
+
+    dynamic_classes: List[Type[VehicleNode]] = []
+    for v in vehicles_data:
+        if isinstance(v, dict):
+            code = v.get("vehicle_code") or v.get("code") or "CUSTOM"
+            name = v.get("name") or code
+            cap = int(v.get("capacity_weight") or v.get("capacity") or 230)
+            max_dist = float(v.get("max_distance") or 1000.0)
+            cost = float(v.get("cost_per_km")) if v.get("cost_per_km") is not None else None
+        else:
+            code = getattr(v, "vehicle_code", None) or getattr(v, "code", "CUSTOM")
+            name = getattr(v, "name", code)
+            cap = int(getattr(v, "capacity_weight", None) or getattr(v, "capacity", 230))
+            max_dist = float(getattr(v, "max_distance", 1000.0) or 1000.0)
+            cost = float(getattr(v, "cost_per_km", None)) if getattr(v, "cost_per_km", None) is not None else None
+
+        cls_obj = create_vehicle_class(
+            vehicle_code=code,
+            name=name,
+            capacity=cap,
+            max_distance=max_dist,
+            cost_per_km=cost,
+        )
+        dynamic_classes.append(cls_obj)
+
+    # 确保有 Express 兜底
+    if not any(issubclass(c, Express) or c is Express for c in dynamic_classes):
+        dynamic_classes.append(Express)
+
+    # 按照载重升序排列
+    dynamic_classes.sort(key=lambda c: VehicleNode.get_truck_field_default(c, 'max_capacity'))
+    return dynamic_classes

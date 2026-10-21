@@ -10,7 +10,7 @@ from app.core import get_distance_provider
 from app.utils.distance import DistanceProvider
 from app.core import routing_registry
 from app.core.database import get_db
-from app.models.routing import (
+from app.models.dto.RoutingDTO import (
     RoutingSolveRequest,
     RoutingSolveResponse,
     GlobalRoutingSolveRequest,

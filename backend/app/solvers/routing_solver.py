@@ -3,7 +3,7 @@
 """
 from app.utils.distance import DistanceProvider
 from app.utils.registry import routing_registry
-from app.models.routing import RoutingSolveRequest
+from app.models.dto.RoutingDTO import RoutingSolveRequest
 
 
 def solve_or_tools_vrp(req: RoutingSolveRequest, provider: DistanceProvider) -> dict:

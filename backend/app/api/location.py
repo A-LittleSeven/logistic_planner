@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.core import get_distance_provider
 from app.utils.distance import DistanceProvider
 from app.core import location_registry
-from app.models.location import LocationSolveRequest, LocationSolveResponse
+from app.models.dto.LocationDTO import LocationSolveRequest, LocationSolveResponse
 from app.solvers import location_solver  # noqa: F401  导入即注册求解器
 
 router = APIRouter()

@@ -1,3 +1,7 @@
+"""系统管理与高德配置数据传输对象 (System DTO)。
+
+专职负责高德 Web Key 与安全密钥配置存取的 HTTP API 请求/响应模型。
+"""
 from typing import Optional
 from pydantic import BaseModel, Field
 

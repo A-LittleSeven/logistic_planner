@@ -1,10 +1,16 @@
+"""规划画布数据传输对象 (Canvas DTO)。
+
+专职负责规划画布、版本创建、快照载入与详情查询的 HTTP API 请求/响应模型。
+"""
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 
 
 class CanvasPoint(BaseModel):
     """门店/规划点数据模型"""
+    model_config = ConfigDict(from_attributes=True, extra="allow")
+
     id: Optional[Any] = None
     shop_code: Optional[str] = None
     name: Optional[str] = None
@@ -56,6 +62,8 @@ class CanvasVersionCreate(BaseModel):
 
 
 class CanvasVersionSummaryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     canvas_id: str
     version_number: int
@@ -65,11 +73,10 @@ class CanvasVersionSummaryResponse(BaseModel):
     stage: str
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
-
 
 class CanvasVersionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     canvas_id: str
     version_number: int
@@ -80,11 +87,10 @@ class CanvasVersionResponse(BaseModel):
     snapshot_data: Dict[str, Any]
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
-
 
 class CanvasSummaryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     canvas_id: str
     name: str
@@ -106,11 +112,10 @@ class CanvasSummaryResponse(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
-
 
 class CanvasDetailResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     canvas_id: str
     name: str
@@ -127,6 +132,3 @@ class CanvasDetailResponse(BaseModel):
     current_version: Optional[CanvasVersionResponse] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True

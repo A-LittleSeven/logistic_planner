@@ -3,7 +3,7 @@ from __future__ import annotations
 from math import floor
 from typing import Any, Optional, Sequence, Union
 
-from app.models.store import StoreNode
+from app.models.do.StoreDO import StoreNode
 from app.utils.distance import haversine
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 

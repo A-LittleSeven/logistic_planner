@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
 from app.db.models import DBTaskHistory
-from app.models.history import TaskHistoryCreate
+from app.models.dto.HistoryDTO import TaskHistoryCreate
 
 
 class TaskHistoryService:
