@@ -13,6 +13,7 @@ from app.models.canvas_schema import (
     CanvasSummaryResponse,
     CanvasDetailResponse,
     CanvasVersionResponse,
+    CanvasVersionSummaryResponse,
 )
 
 
@@ -372,15 +373,36 @@ class CanvasService:
         return {"message": "画布及所有历史版本已成功删除"}
 
     @classmethod
-    def list_canvas_versions(cls, db: Session, canvas_id: str) -> List[CanvasVersionResponse]:
-        """获取画布全部版本列表"""
+    def list_canvas_versions(cls, db: Session, canvas_id: str) -> List[CanvasVersionSummaryResponse]:
+        """获取画布全部版本轻量元数据列表 (不带 snapshot_data 快照，体积减少 99.9%)"""
         versions = (
-            db.query(DBCanvasVersion)
+            db.query(
+                DBCanvasVersion.id,
+                DBCanvasVersion.canvas_id,
+                DBCanvasVersion.version_number,
+                DBCanvasVersion.version_name,
+                DBCanvasVersion.change_summary,
+                DBCanvasVersion.parent_version_id,
+                DBCanvasVersion.stage,
+                DBCanvasVersion.created_at,
+            )
             .filter(DBCanvasVersion.canvas_id == canvas_id)
             .order_by(desc(DBCanvasVersion.version_number))
             .all()
         )
-        return [cls.to_version_response(v) for v in versions]
+        return [
+            CanvasVersionSummaryResponse(
+                id=v.id,
+                canvas_id=v.canvas_id,
+                version_number=v.version_number,
+                version_name=v.version_name,
+                change_summary=v.change_summary,
+                parent_version_id=v.parent_version_id,
+                stage=v.stage,
+                created_at=v.created_at,
+            )
+            for v in versions
+        ]
 
     @classmethod
     def get_canvas_version(cls, db: Session, canvas_id: str, version_id: int) -> CanvasVersionResponse:

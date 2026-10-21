@@ -10,6 +10,7 @@ from app.models.canvas_schema import (
     CanvasSummaryResponse,
     CanvasDetailResponse,
     CanvasVersionResponse,
+    CanvasVersionSummaryResponse,
 )
 from app.services.canvas_service import CanvasService
 
@@ -45,7 +46,7 @@ def delete_canvas(canvas_id: str, db: Session = Depends(get_db)):
     return CanvasService.delete_canvas(db, canvas_id)
 
 
-@router.get("/{canvas_id}/versions", response_model=List[CanvasVersionResponse], summary="获取画布历史版本列表")
+@router.get("/{canvas_id}/versions", response_model=List[CanvasVersionSummaryResponse], summary="获取画布历史版本列表(轻量元数据)")
 def list_canvas_versions(canvas_id: str, db: Session = Depends(get_db)):
     return CanvasService.list_canvas_versions(db, canvas_id)
 

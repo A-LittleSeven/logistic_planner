@@ -55,6 +55,20 @@ class CanvasVersionCreate(BaseModel):
     snapshot_data: Dict[str, Any] = Field(..., description="版本完整快照数据")
 
 
+class CanvasVersionSummaryResponse(BaseModel):
+    id: int
+    canvas_id: str
+    version_number: int
+    version_name: Optional[str] = None
+    change_summary: Optional[str] = None
+    parent_version_id: Optional[int] = None
+    stage: str
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
 class CanvasVersionResponse(BaseModel):
     id: int
     canvas_id: str

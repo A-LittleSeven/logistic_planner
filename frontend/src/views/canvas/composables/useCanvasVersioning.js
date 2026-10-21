@@ -209,6 +209,22 @@ export function useCanvasVersioning(state, options = {}) {
 
     savingVersion.value = true
     try {
+      // 轻量化清理 daily_results: 剔除自引用的 raw_route、巨大的 points/stops 重复大对象及临时测算折线缓存
+      const cleanDailyResults = {}
+      if (dailyResults.value) {
+        Object.entries(dailyResults.value).forEach(([day, dayData]) => {
+          if (dayData && Array.isArray(dayData.routes)) {
+            cleanDailyResults[day] = {
+              ...dayData,
+              routes: dayData.routes.map((r) => {
+                const { raw_route, points, stops, detailed_polyline, amap_path, pathCoords, ...cleanR } = r
+                return cleanR
+              }),
+            }
+          }
+        })
+      }
+
       const snapshotData = {
         stores: stores.value,
         depot: {
@@ -219,7 +235,6 @@ export function useCanvasVersioning(state, options = {}) {
           address: canvas.depot_address,
         },
         clustering_data: {
-          points: stores.value,
           clusters: clusteringResult.value?.clusters || [],
           algorithm: clusteringAlgorithm.value,
           k: clusteringK.value,
@@ -227,13 +242,10 @@ export function useCanvasVersioning(state, options = {}) {
           maxZoneSize: maxZoneSize.value,
         },
         schedule_data: {
-          points: stores.value,
           schedule_results: scheduleResult.value || {},
         },
         routing_data: {
-          points: stores.value,
-          daily_results: dailyResults.value,
-          routes: allWeekRoutes.value,
+          daily_results: cleanDailyResults,
           trucks: trucks.value,
         },
         algorithm_configs: {
