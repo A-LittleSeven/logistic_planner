@@ -83,10 +83,6 @@ function clearAll() {
   overlays.length = 0
 }
 
-function setClickHandler(fn) {
-  if (map) map.on('click', fn)
-}
-
 function fitView(padding = [60, 60, 60, 60]) {
   if (map && overlays.length) map.setFitView(overlays, false, padding)
 }
@@ -94,7 +90,7 @@ function fitView(padding = [60, 60, 60, 60]) {
 const getMap = () => map
 const getAmap = () => whenReady()
 
-defineExpose({ whenReady, getAmap, addOverlay, clearAll, setClickHandler, fitView, getMap })
+defineExpose({ whenReady, getAmap, addOverlay, clearAll, fitView, getMap })
 </script>
 
 <style scoped>

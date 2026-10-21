@@ -136,7 +136,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:visible', 'toggle-express', 'batch-set-express'])
 
-const { getStoreScheduleDays, isStoreExpressOnDay, setStoreExpressOnDay } = useRouteOptimizer()
+const { getStoreScheduleDays, isStoreExpressOnDay } = useRouteOptimizer()
 
 const searchText = ref('')
 const filterStatus = ref('ALL')
