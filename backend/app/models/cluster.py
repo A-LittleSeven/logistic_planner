@@ -62,18 +62,6 @@ class ClusterNode(BaseModel):
         :return: 区域门店总数量
         """
         return len(self.cluster_store_detailed)
-
-    def get_nearest_cluster(self, other_clusters: list["ClusterNode"]) -> Optional["ClusterNode"]:
-        """
-        获取最近的簇（按仓库距离）
-        :param other_clusters: 其他簇列表
-        :return: 最近的簇
-        """
-        if not other_clusters:
-            return None
-        other_clusters = [c for c in other_clusters if c.is_planned != True]
-        return min(other_clusters, key=lambda x: abs(self.cdist_warehouse - x.cdist_warehouse))
-
     def get_nearest_n_cluster(self, all_clusters: List["ClusterNode"], n: int = 2) -> List["ClusterNode"]:
         """
         获取当前簇地理距离最近 of n 个簇

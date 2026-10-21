@@ -1,27 +1,11 @@
-/**
- * useRouteOptimizer.js
- * 路线优化调度与站点拓扑调整引擎 (2-Opt 顺路优化 / 单日与全周快递直发管理 / 站点次序调整 / 指标重新汇总)
- */
+import { getDistanceBetweenCoords } from '../utils/constants.js'
 
 export function useRouteOptimizer() {
   /**
-   * 计算地球表面两点间球面距离 (km)
+   * 计算地球表面两点间球面距离 (km)，统一复用 constants.js 算法
    */
   const calcDistanceKm = (lng1, lat1, lng2, lat2) => {
-    const numLng1 = Number(lng1)
-    const numLat1 = Number(lat1)
-    const numLng2 = Number(lng2)
-    const numLat2 = Number(lat2)
-    if (isNaN(numLng1) || isNaN(numLat1) || isNaN(numLng2) || isNaN(numLat2)) return 0
-    if (numLng1 === 0 && numLat1 === 0) return 0
-    if (numLng2 === 0 && numLat2 === 0) return 0
-
-    const radLat1 = (numLat1 * Math.PI) / 180.0
-    const radLat2 = (numLat2 * Math.PI) / 180.0
-    const a = radLat1 - radLat2
-    const b = ((numLng1 - numLng2) * Math.PI) / 180.0
-    const s = 2 * Math.asin(Math.sqrt(Math.pow(Math.sin(a / 2), 2) + Math.cos(radLat1) * Math.cos(radLat2) * Math.pow(Math.sin(b / 2), 2)))
-    return s * 6378.137
+    return getDistanceBetweenCoords({ lng: lng1, lat: lat1 }, { lng: lng2, lat: lat2 })
   }
 
   /**

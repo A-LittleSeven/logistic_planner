@@ -14,10 +14,6 @@ const routes = [
       { path: 'config/store', name: 'store', component: () => import('./views/config/StoreManage.vue'), meta: { title: '门店维护' } },
       { path: 'config/vehicle', name: 'vehicle', component: () => import('./views/config/VehicleManage.vue'), meta: { title: '车型维护' } },
       { path: 'config/depot', name: 'depot', component: () => import('./views/config/DepotManage.vue'), meta: { title: '起点管理' } },
-      
-      { path: 'clustering/plan', redirect: '/canvas' },
-      { path: 'clustering/schedule', redirect: '/canvas' },
-      { path: 'routing/plan', redirect: '/canvas' },
 
       { path: 'settings', name: 'settings', component: () => import('./views/settings/SystemSettings.vue'), meta: { title: '系统设置' } },
     ]

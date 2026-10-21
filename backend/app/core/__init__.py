@@ -40,9 +40,6 @@ def __getattr__(name: str):
     if name == "plan_daily_routes_with_or":
         from app.core.optimizer.route_local_replaning_with_or import plan_daily_routes_with_or
         return plan_daily_routes_with_or
-    if name == "build_store_node":
-        from app.core.utils.datautils import build_store_node
-        return build_store_node
     if name in ("haversine", "baidu_driving_distance"):
         from app.utils.distance import haversine, baidu_driving_distance
         return haversine if name == "haversine" else baidu_driving_distance

@@ -42,6 +42,8 @@ backend/celerybeat.pid
 # Logs and databases
 *.log
 *.log.*
+logs/
+backend/logs/
 backend/app/core/log/
 *.sqlite3
 

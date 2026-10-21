@@ -3,7 +3,7 @@ import os
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
-_HERE = Path(__file__).parent.parent
+_BACKEND_ROOT = Path(__file__).resolve().parents[3]
 
 
 class LogUtil:
@@ -21,10 +21,10 @@ class LogUtil:
         logger = logging.getLogger(module_name)
         logger.setLevel(logging.INFO)
 
-        # 设置路径
-        log_dir = _HERE / 'log'
+        # 设置路径为 backend/logs
+        log_dir = _BACKEND_ROOT / 'logs'
         if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
+            os.makedirs(log_dir, exist_ok=True)
 
         if not logger.handlers:
             log_file = os.path.join(log_dir, f"{module_name}.log")
