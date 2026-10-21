@@ -1,15 +1,15 @@
-"""店群规划 API。"""
-import json
-import logging
-import uuid
-from datetime import datetime
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+"""店群规划与周排班 API 控制器 (Clustering API Router)。
+
+纯粹负责 HTTP 请求接入、参数校验、求解服务委派与结果响应。
+所有聚类算法组织、周排班均衡与任务持久化逻辑均下沉至 PlanExecutionService。
+"""
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core import get_distance_provider
 from app.utils.distance import DistanceProvider
 from app.core import clustering_registry, schedule_registry
+from app.core.database import get_db
 from app.models.clustering import (
     ClusteringSolveRequest,
     ClusteringSolveResponse,
@@ -20,209 +20,44 @@ from app.models.clustering import (
 )
 from app.solvers import clustering_solver  # noqa: F401  导入即注册求解器
 from app.solvers import schedule_solver    # noqa: F401  导入即注册排班求解器
-from app.core.database import get_db
-from app.db.models import DBTaskHistory
-from app.utils.serialization import safe_json_dumps
-
-logger = logging.getLogger(__name__)
+from app.services.plan_service import PlanExecutionService
 
 router = APIRouter()
 
 
-@router.get("/algorithms")
+@router.get("/algorithms", summary="获取支持的店群聚类算法列表")
 def algorithms():
     return {"algorithms": clustering_registry.list()}
 
 
-@router.get("/schedule/algorithms")
+@router.get("/schedule/algorithms", summary="获取支持的排班算法列表")
 def schedule_algorithms():
     return {"algorithms": schedule_registry.list()}
 
-@router.post("/solve", response_model=ClusteringSolveResponse)
+
+@router.post("/solve", response_model=ClusteringSolveResponse, summary="店群聚类规划求解")
 def solve(
     req: ClusteringSolveRequest,
     provider: DistanceProvider = Depends(get_distance_provider),
     db: Session = Depends(get_db),
 ):
-    if not req.points:
-        raise HTTPException(status_code=400, detail="请添加门店点")
-
-    try:
-        solver = clustering_registry.get(req.algorithm)
-    except KeyError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    
-    task_id = str(uuid.uuid4())
-    try:
-        res = solver(req, provider)
-        try:
-            db_task = DBTaskHistory(
-                task_id=task_id,
-                task_type="CLUSTERING",
-                save_type="AUTO",
-                status="SUCCESS",
-                parameters=safe_json_dumps(req),
-                result=safe_json_dumps(res),
-            )
-            db.add(db_task)
-            db.commit()
-        except Exception:
-            logger.exception("写入店群规划任务历史记录失败")
-        return res
-    except Exception as e:
-        try:
-            db_task = DBTaskHistory(
-                task_id=task_id,
-                task_type="CLUSTERING",
-                save_type="AUTO",
-                status="FAILED",
-                parameters=safe_json_dumps(req),
-                error_message=str(e),
-            )
-            db.add(db_task)
-            db.commit()
-        except Exception:
-            logger.exception("写入店群规划失败任务历史记录失败")
-        raise HTTPException(status_code=400, detail=str(e))
+    return PlanExecutionService.execute_clustering(db, req, provider)
 
 
-@router.post("/solve_schedule", response_model=ScheduleSolveResponse)
+@router.post("/solve_schedule", response_model=ScheduleSolveResponse, summary="店群多日排班均衡求解")
 def solve_schedule(
     req: ScheduleSolveRequest,
     provider: DistanceProvider = Depends(get_distance_provider),
     db: Session = Depends(get_db),
 ):
-    if not req.points:
-        raise HTTPException(status_code=400, detail="请添加门店点")
-
-    algorithm_name = req.algorithm or "cluster_balanced"
-    try:
-        solver = schedule_registry.get(algorithm_name)
-    except KeyError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    task_id = str(uuid.uuid4())
-    try:
-        resp_data = solver(req)
-
-        try:
-            db_task = DBTaskHistory(
-                task_id=task_id,
-                task_type="CLUSTER_SCHEDULE",
-                save_type="AUTO",
-                status="SUCCESS",
-                parameters=req.model_dump_json() if hasattr(req, 'model_dump_json') else json.dumps(req.dict()),
-                result=json.dumps(resp_data),
-            )
-            db.add(db_task)
-            db.commit()
-        except Exception:
-            logger.exception("写入排班任务历史记录失败")
-
-        return resp_data
-
-    except Exception as e:
-        try:
-            db_task = DBTaskHistory(
-                task_id=task_id,
-                task_type="CLUSTER_SCHEDULE",
-                save_type="AUTO",
-                status="FAILED",
-                parameters=req.model_dump_json() if hasattr(req, 'model_dump_json') else json.dumps(req.dict()),
-                error_message=str(e),
-            )
-            db.add(db_task)
-            db.commit()
-        except Exception:
-            logger.exception("写入排班失败任务历史记录失败")
-        raise HTTPException(status_code=400, detail=str(e))
+    return PlanExecutionService.execute_schedule(db, req, provider)
 
 
-
-
-@router.post("/save_plan")
+@router.post("/save_plan", summary="保存店群规划方案至历史存盘")
 def save_plan(req: SaveClusterPlanRequest, db: Session = Depends(get_db)):
-    if not req.points:
-        raise HTTPException(status_code=400, detail="门店点列表不能为空")
-    
-    task_id = str(uuid.uuid4())
-    params = {
-        "title": req.title,
-        "algorithm": req.algorithm,
-        "depot_name": req.depot_name,
-        "depot_lng": req.depot_lng,
-        "depot_lat": req.depot_lat,
-        "k": req.k or len(req.clusters),
-        "points_count": len(req.points)
-    }
-    result_data = {
-        "title": req.title,
-        "algorithm": req.algorithm,
-        "depot_name": req.depot_name,
-        "depot_lng": req.depot_lng,
-        "depot_lat": req.depot_lat,
-        "points": req.points,
-        "clusters": req.clusters,
-        "assignments": req.assignments,
-        "k": req.k or len(req.clusters)
-    }
-    try:
-        db_task = DBTaskHistory(
-            task_id=task_id,
-            task_type="CLUSTERING",
-            save_type="MANUAL",
-            status="SUCCESS",
-            parameters=json.dumps(params, ensure_ascii=False),
-            result=json.dumps(result_data, ensure_ascii=False)
-        )
-        db.add(db_task)
-        db.commit()
-        return {
-            "status": "success",
-            "task_id": task_id,
-            "message": "店群规划方案已成功保存至历史记录！"
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"保存失败: {str(e)}")
+    return PlanExecutionService.save_clustering_plan(db, req)
 
 
-
-
-
-@router.post("/save_schedule")
+@router.post("/save_schedule", summary="保存排班规划方案至历史存盘")
 def save_schedule(req: SaveScheduleRequest, db: Session = Depends(get_db)):
-    task_id = f"SCHED_{int(datetime.now().timestamp() * 1000)}"
-    params = {
-        "title": req.title,
-        "depot_name": req.depot_name,
-        "depot_lng": req.depot_lng,
-        "depot_lat": req.depot_lat,
-        "points_count": len(req.points)
-    }
-    result_data = {
-        "title": req.title,
-        "depot_name": req.depot_name,
-        "depot_lng": req.depot_lng,
-        "depot_lat": req.depot_lat,
-        "points": req.points
-    }
-    try:
-        db_task = DBTaskHistory(
-            task_id=task_id,
-            task_type="CLUSTER_SCHEDULE",
-            save_type="MANUAL",
-            status="SUCCESS",
-            parameters=json.dumps(params, ensure_ascii=False),
-            result=json.dumps(result_data, ensure_ascii=False)
-        )
-        db.add(db_task)
-        db.commit()
-        return {
-            "status": "success",
-            "task_id": task_id,
-            "message": "店群排班方案已成功保存至历史记录！"
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"保存失败: {str(e)}")
-
-
+    return PlanExecutionService.save_schedule_plan(db, req)
