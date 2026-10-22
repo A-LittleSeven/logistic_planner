@@ -32,6 +32,13 @@ from app.models.dto.CanvasDTO import (
     CanvasCreate, CanvasUpdate, CanvasVersionCreate, CanvasDetailResponse, CanvasSummaryResponse
 )
 
+# 转换适配器导出
+from app.models.ModelConverter import (
+    normalize_coordinates,
+    parse_available_trucks,
+    to_store_node,
+)
+
 __all__ = [
     "dto",
     "do",

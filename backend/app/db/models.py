@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text
 from sqlalchemy.sql import func
-from app.core.database import Base
+from app.db.database import Base
 
 class DBStore(Base):
     __tablename__ = "stores"

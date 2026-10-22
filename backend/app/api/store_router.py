@@ -7,7 +7,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.db.database import get_db
 from app.models.dto.StoreDTO import (
     StoreCreate,
     StoreUpdate,

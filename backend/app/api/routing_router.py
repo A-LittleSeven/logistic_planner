@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.core import get_distance_provider
 from app.utils.distance import DistanceProvider
 from app.core import routing_registry
-from app.core.database import get_db
+from app.db.database import get_db
 from app.models.dto.RoutingDTO import (
     RoutingSolveRequest,
     RoutingSolveResponse,

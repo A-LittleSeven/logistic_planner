@@ -2,11 +2,11 @@ import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
 
-from app.core.cluster.baseCluster import BaseCluster
+from app.core.cluster.base_cluster import BaseCluster
 from app.utils.distance import haversine
 
 
-class ClusterByDistrictExtension(BaseCluster):
+class DistrictExtensionCluster(BaseCluster):
     """
     基于行政区划构建业务片区。
     """

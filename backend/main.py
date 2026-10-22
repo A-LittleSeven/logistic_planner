@@ -10,8 +10,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.utils.config import settings
-from app.api import location, routing, clustering, store_router, vehicle_router, history_router, depot_router, system_router, canvas_router
-from app.core.database import Base, engine
+from app.api import (
+    location_router,
+    routing_router,
+    clustering_router,
+    store_router,
+    vehicle_router,
+    history_router,
+    depot_router,
+    system_router,
+    canvas_router,
+)
+from app.db.database import Base, engine
 
 # 自动创建本地 SQLite 数据库表
 Base.metadata.create_all(bind=engine)
@@ -38,9 +48,9 @@ def health():
 
 
 app.include_router(canvas_router.router, prefix="/api/canvas", tags=["规划画布"])
-app.include_router(location.router, prefix="/api/location", tags=["物流选址"])
-app.include_router(routing.router, prefix="/api/routing", tags=["路线规划"])
-app.include_router(clustering.router, prefix="/api/clustering", tags=["店群规划"])
+app.include_router(location_router.router, prefix="/api/location", tags=["物流选址"])
+app.include_router(routing_router.router, prefix="/api/routing", tags=["路线规划"])
+app.include_router(clustering_router.router, prefix="/api/clustering", tags=["店群规划"])
 app.include_router(store_router.router, prefix="/api/store", tags=["门店管理"])
 app.include_router(vehicle_router.router, prefix="/api/vehicle", tags=["车辆管理"])
 app.include_router(depot_router.router, prefix="/api/depot", tags=["起点管理"])

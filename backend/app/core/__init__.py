@@ -11,17 +11,17 @@ from app.utils.registry import location_registry, routing_registry, clustering_r
 def __getattr__(name: str):
     """懒加载 - 仅在真正使用时才导入重型模块。"""
     if name == "BaseCluster":
-        from app.core.cluster.baseCluster import BaseCluster
+        from app.core.cluster.base_cluster import BaseCluster
         return BaseCluster
-    if name == "getClusterByConstrainedKmeans":
-        from app.core.cluster.get_cluster_by_C_kmeans import getClusterByConstrainedKmeans
-        return getClusterByConstrainedKmeans
-    if name == "ClusterByDistinct":
-        from app.core.cluster.get_cluster_by_district import ClusterByDistinct
-        return ClusterByDistinct
-    if name == "ClusterByDistrictExtension":
-        from app.core.cluster.get_cluster_by_district_extension import ClusterByDistrictExtension
-        return ClusterByDistrictExtension
+    if name == "ConstrainedKmeansCluster":
+        from app.core.cluster.constrained_kmeans_cluster import ConstrainedKmeansCluster
+        return ConstrainedKmeansCluster
+    if name == "DistrictCluster":
+        from app.core.cluster.district_cluster import DistrictCluster
+        return DistrictCluster
+    if name == "DistrictExtensionCluster":
+        from app.core.cluster.district_extension_cluster import DistrictExtensionCluster
+        return DistrictExtensionCluster
     if name == "LogUtil":
         from app.utils.logger import LogUtil
         return LogUtil
@@ -32,13 +32,13 @@ def __getattr__(name: str):
         from app.core.optimizer.truck_schedule import TruckSchedule
         return TruckSchedule
     if name == "working_schedule":
-        from app.core.optimizer.working_schedule import working_schedule
+        from app.core.optimizer.schedule_balancer import working_schedule
         return working_schedule
     if name == "balance_schedule":
-        from app.core.optimizer.working_schedule import balance_schedule
+        from app.core.optimizer.schedule_balancer import balance_schedule
         return balance_schedule
     if name == "plan_daily_routes_with_or":
-        from app.core.optimizer.route_local_replaning_with_or import plan_daily_routes_with_or
+        from app.core.optimizer.route_replanner import plan_daily_routes_with_or
         return plan_daily_routes_with_or
     if name in ("haversine", "baidu_driving_distance"):
         from app.utils.distance import haversine, baidu_driving_distance

@@ -3,10 +3,10 @@ import pandas as pd
 from scipy.spatial.distance import cdist
 from sklearn.cluster import KMeans
 
-from app.core.cluster.baseCluster import BaseCluster
+from app.core.cluster.base_cluster import BaseCluster
 
 
-class getClusterByConstrainedKmeans(BaseCluster):
+class ConstrainedKmeansCluster(BaseCluster):
     def __init__(self, data: pd.DataFrame,
                  n_clusters,
                  lng_col='longitude',

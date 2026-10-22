@@ -60,19 +60,19 @@ def solve_clustering(req: ClusteringSolveRequest, provider: DistanceProvider) ->
     # Choose algorithm
     alg = req.algorithm
     if alg == "kmeans":
-        from app.core import getClusterByConstrainedKmeans
+        from app.core.cluster.constrained_kmeans_cluster import ConstrainedKmeansCluster
         n_clusters = req.k
         if n_clusters > len(df):
             n_clusters = len(df)
-        clusterer = getClusterByConstrainedKmeans(df, n_clusters=n_clusters, lng_col="lng", lat_col="lat", freq_col="frequency")
+        clusterer = ConstrainedKmeansCluster(df, n_clusters=n_clusters, lng_col="lng", lat_col="lat", freq_col="frequency")
     elif alg == "district":
-        from app.core import ClusterByDistinct
-        clusterer = ClusterByDistinct(df, distinct_col="district", lng_col="lng", lat_col="lat")
+        from app.core.cluster.district_cluster import DistrictCluster
+        clusterer = DistrictCluster(df, distinct_col="district", lng_col="lng", lat_col="lat")
     elif alg == "district_extension":
-        from app.core import ClusterByDistrictExtension
+        from app.core.cluster.district_extension_cluster import DistrictExtensionCluster
         min_size = req.options.get("min_zone_size", 20)
         max_size = req.options.get("max_zone_size", 40)
-        clusterer = ClusterByDistrictExtension(
+        clusterer = DistrictExtensionCluster(
             df,
             min_zone_size=int(min_size),
             max_zone_size=int(max_size),

@@ -45,7 +45,7 @@ def solve_or_tools_vrp(req: RoutingSolveRequest, provider: DistanceProvider) -> 
     missing_codes = [getattr(p, "shop_code", "") or p.name for p in customers if getattr(p, "is_homepot", None) is None]
     if missing_codes:
         try:
-            from app.core.database import SessionLocal
+            from app.db.database import SessionLocal
             from app.db.models import DBStore
             db = SessionLocal()
             db_stores = db.query(DBStore).all()
@@ -58,7 +58,7 @@ def solve_or_tools_vrp(req: RoutingSolveRequest, provider: DistanceProvider) -> 
         except Exception:
             pass
 
-    # Convert customers to stores dict list for route_local_replaning_with_or
+    # Convert customers to stores dict list for route_replanner
     stores_data = []
     for idx, p in enumerate(customers):
         p_name = (p.name or "").strip()
@@ -112,7 +112,7 @@ def solve_or_tools_vrp(req: RoutingSolveRequest, provider: DistanceProvider) -> 
     # Pass the heterogeneous vehicle fleet (trucks)
     trucks_data = [t.model_dump() if hasattr(t, "model_dump") else dict(t) for t in req.trucks]
 
-    from app.core.optimizer.route_local_replaning_with_or import plan_daily_routes_with_or
+    from app.core.optimizer.route_replanner import plan_daily_routes_with_or
     daily_routes = plan_daily_routes_with_or(
         stores=stores_data,
         trucks=trucks_data,

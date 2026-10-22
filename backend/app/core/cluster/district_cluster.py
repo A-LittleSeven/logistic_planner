@@ -1,9 +1,9 @@
 import pandas as pd
 
-from app.core.cluster.baseCluster import BaseCluster
+from app.core.cluster.base_cluster import BaseCluster
 
 
-class ClusterByDistinct(BaseCluster):
+class DistrictCluster(BaseCluster):
     def __init__(self, data: pd.DataFrame,
                  distinct_col='district',
                  lng_col='longitude',
