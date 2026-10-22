@@ -243,7 +243,7 @@ export function useRouteOptimizer() {
    */
   const clearRouteMeasureCache = (route) => {
     if (!route) return
-    const keys = ['detailed_polyline', 'amap_path', 'amap_distance', 'amap_duration', 'amap_tolls', 'pathCoords']
+    const keys = ['detailed_polyline', 'amap_path', 'amap_distance', 'amap_duration', 'amap_tolls', 'pathCoords', 'poly_key']
     keys.forEach((k) => delete route[k])
   }
 

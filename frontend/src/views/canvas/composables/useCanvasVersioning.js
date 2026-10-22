@@ -4,6 +4,7 @@ import { canvasApi } from '../../../api/client.js'
 import { DAYS_LIST, getDistanceBetweenCoords } from '../../../utils/constants.js'
 import { useRouteOptimizer } from '../../../composables/useRouteOptimizer.js'
 import { useRouteExport } from '../../../composables/useRouteExport.js'
+import { packDailyResultsPolylines, unpackDailyResultsPolylines } from '../../../utils/polylineCompressor.js'
 
 /**
  * 解包并规范化排班数据，避免 schedule_results 属性多层嵌套导致的结构损坏
@@ -49,6 +50,7 @@ export function useCanvasVersioning(state, options = {}) {
     totalLoads,
     routes,
     totalDistanceKm,
+    routingMeasureSummary,
     allWeekRoutes,
     selectedScheduleDay,
     selectedRoutingDay,
@@ -155,6 +157,9 @@ export function useCanvasVersioning(state, options = {}) {
     }
 
     if (snapshot.routing_data) {
+      if (routingMeasureSummary) {
+        routingMeasureSummary.value = snapshot.routing_data.measure_summary || null
+      }
       if (snapshot.routing_data.daily_results) {
         const rawDaily = snapshot.routing_data.daily_results
         const hydratedDaily = {}
@@ -168,6 +173,7 @@ export function useCanvasVersioning(state, options = {}) {
             }
           }
         })
+        unpackDailyResultsPolylines(hydratedDaily, snapshot.routing_data.polyline_pool)
         dailyResults.value = hydratedDaily
         if (selectedRoutingDay) {
           if (hydratedDaily['周一']?.routes?.length) {
@@ -180,11 +186,13 @@ export function useCanvasVersioning(state, options = {}) {
           }
         }
       } else if (snapshot.routing_data.routes?.length) {
-        dailyResults.value = {
+        const fallbackDaily = {
           '全部': {
             routes: hydrateRoutePoints(snapshot.routing_data.routes, stores.value, { defaultReturnToDepot: routeOptions.value?.return_to_depot }),
           },
         }
+        unpackDailyResultsPolylines(fallbackDaily, snapshot.routing_data.polyline_pool)
+        dailyResults.value = fallbackDaily
         if (selectedRoutingDay) selectedRoutingDay.value = '全部'
       } else {
         dailyResults.value = {}
@@ -193,6 +201,7 @@ export function useCanvasVersioning(state, options = {}) {
         trucks.value = snapshot.routing_data.trucks
       }
     } else {
+      if (routingMeasureSummary) routingMeasureSummary.value = null
       dailyResults.value = {}
     }
 
@@ -250,21 +259,9 @@ export function useCanvasVersioning(state, options = {}) {
 
     savingVersion.value = true
     try {
-      // 轻量化清理 daily_results: 剔除自引用的 raw_route、巨大的 points/stops 重复大对象及临时测算折线缓存
-      const cleanDailyResults = {}
-      if (dailyResults.value) {
-        Object.entries(dailyResults.value).forEach(([day, dayData]) => {
-          if (dayData && Array.isArray(dayData.routes)) {
-            cleanDailyResults[day] = {
-              ...dayData,
-              routes: dayData.routes.map((r) => {
-                const { raw_route, points, stops, detailed_polyline, amap_path, pathCoords, ...cleanR } = r
-                return cleanR
-              }),
-            }
-          }
-        })
-      }
+      // 提取公共路段并对高精度折线做紧凑差值编码 (Polyline Pool & Encoding)
+      // 彻底解决几百条路线存储膨胀问题的同时，完整保留真实路网测算折线
+      const { cleanDailyResults, polylinePool } = packDailyResultsPolylines(dailyResults.value)
 
       const snapshotData = {
         stores: stores.value,
@@ -285,6 +282,8 @@ export function useCanvasVersioning(state, options = {}) {
         schedule_data: unwrapScheduleData(scheduleResult.value),
         routing_data: {
           daily_results: cleanDailyResults,
+          polyline_pool: polylinePool,
+          measure_summary: routingMeasureSummary?.value || null,
           trucks: trucks.value,
         },
         algorithm_configs: {

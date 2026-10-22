@@ -159,7 +159,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useCanvasState } from '../composables/useCanvasState.js'
 import { routingApi } from '../../../api/client.js'
 import { useRouteMeasure } from '../../../composables/useRouteMeasure.js'
@@ -190,6 +190,7 @@ const {
   routes,
   expressStores,
   highlightedRouteIdx,
+  routingMeasureSummary,
   recalculateRouteMetrics,
   handleRestoreExpressStore,
   moveStoreBetweenRoutes,
@@ -214,6 +215,24 @@ const {
   measureSingleRoute,
   batchMeasureRoutes,
 } = useRouteMeasure()
+
+// 与全局持久化测算总览建立响应式同步
+watch(
+  routingMeasureSummary,
+  (val) => {
+    if (val !== measureSummary.value) {
+      measureSummary.value = val
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  measureSummary,
+  (val) => {
+    routingMeasureSummary.value = val
+  }
+)
 
 const handleRunRouting = async () => {
   if (stores.value.length < 1) {

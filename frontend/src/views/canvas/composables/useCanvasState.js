@@ -47,6 +47,7 @@ export function provideCanvasState(canvasId) {
   const selectedRoutingDay = ref('周一')
   const isScheduleOutdated = ref(false)
   const isRoutingOutdated = ref(false)
+  const routingMeasureSummary = ref(null)
 
   // 3. Algorithm Parameters
   const clusteringAlgorithm = ref('kmeans')
@@ -472,6 +473,7 @@ export function provideCanvasState(canvasId) {
     currentDisplayRoutes,
     routes,
     totalDistanceKm,
+    routingMeasureSummary,
     hasClusteringComputed,
     hasScheduleComputed,
     hasRoutingComputed,
