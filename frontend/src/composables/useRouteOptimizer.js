@@ -239,11 +239,11 @@ export function useRouteOptimizer() {
   }
 
   /**
-   * 清除路线上的高德测算缓存 (detailed_polyline / amap_path / amap_distance 等)
+   * 清除路线上的高德测算缓存与失真索引
    */
   const clearRouteMeasureCache = (route) => {
     if (!route) return
-    const keys = ['detailed_polyline', 'amap_path', 'amap_distance', 'amap_duration', 'amap_tolls', 'pathCoords', 'poly_key']
+    const keys = ['detailed_polyline', 'amap_path', 'amap_distance', 'amap_duration', 'amap_tolls', 'pathCoords', 'poly_key', 'order']
     keys.forEach((k) => delete route[k])
   }
 
@@ -305,8 +305,8 @@ export function useRouteOptimizer() {
    */
   const moveStoreOrder = (route, storeSeq, direction) => {
     if (!route) return false
-    const pts = route.points || route.stops || route.order
-    if (!pts) return false
+    const pts = route.points || route.stops
+    if (!pts || !Array.isArray(pts)) return false
 
     const newIndex = storeSeq + direction
     if (newIndex < 0 || newIndex >= pts.length) return false
@@ -336,25 +336,46 @@ export function useRouteOptimizer() {
   const hydrateRoutePoints = (routesList, targetStores = [], options = {}) => {
     if (!routesList || !Array.isArray(routesList)) return []
     const defaultReturn = options.defaultReturnToDepot ?? false
+    const allStorePool = options.allStores || targetStores || []
+
+    // 构建门店快速查找索引字典 (shop_code 和 name 双重索引)，保证 O(1) 匹配
+    const storeMap = new Map()
+    if (Array.isArray(allStorePool)) {
+      allStorePool.forEach((s) => {
+        if (!s) return
+        if (s.shop_code) storeMap.set(String(s.shop_code), s)
+        if (s.name) storeMap.set(String(s.name), s)
+      })
+    }
+
+    const findStore = (p) => {
+      if (!p) return null
+      if (typeof p === 'string') {
+        return storeMap.get(p) || null
+      }
+      if (typeof p === 'object') {
+        if (p.shop_code && storeMap.has(String(p.shop_code))) {
+          return storeMap.get(String(p.shop_code))
+        }
+        if (p.name && storeMap.has(String(p.name))) {
+          return storeMap.get(String(p.name))
+        }
+      }
+      return p
+    }
+
     return routesList.map((r, rIdx) => {
       let pts = []
-      if (Array.isArray(r.points) && r.points.length > 0) {
-        pts = r.points.map((p) => {
-          if (targetStores.length) {
-            const match = targetStores.find((s) => (s.shop_code && s.shop_code === p.shop_code) || s.name === p.name)
-            if (match) return match
-          }
-          return p
-        })
-      } else if (Array.isArray(r.stops) && r.stops.length > 0) {
-        pts = r.stops.map((p) => {
-          if (targetStores.length) {
-            const match = targetStores.find((s) => (s.shop_code && s.shop_code === p.shop_code) || s.name === p.name)
-            if (match) return match
-          }
-          return p
-        })
+      // 1. 优先读取路线持久化的最新途经站点列表 (r.stops 或 r.points)
+      const stopList =
+        (Array.isArray(r.stops) && r.stops.length > 0 && r.stops) ||
+        (Array.isArray(r.points) && r.points.length > 0 && r.points) ||
+        null
+
+      if (stopList) {
+        pts = stopList.map(findStore).filter(Boolean)
       } else if (Array.isArray(r.order) && r.order.length > 0) {
+        // 2. 仅在历史版本完全无 stops 标识时，走旧 order 兜底
         const storeIndices = r.order.filter((idx) => idx !== -1)
         pts = storeIndices.map((idx) => targetStores[idx]).filter(Boolean)
       }

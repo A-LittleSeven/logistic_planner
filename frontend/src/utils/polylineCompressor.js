@@ -135,16 +135,27 @@ export function packDailyResultsPolylines(dailyResults) {
           (Array.isArray(r.pathCoords) && r.pathCoords.length >= 2 && r.pathCoords) ||
           null
 
-        // 剔除内存自引用及巨大临时属性
+        // 精准提取轻量化站点序列：仅记录 shop_code 与 name，每条路线仅需几十字节
+        // 既杜绝了将庞大完整 store 对象直接序列化造成的存储膨胀，又 100% 保留了人工调整后的经停次序
+        const currentPoints = r.points || r.stops || []
+        const cleanStops = currentPoints.map((p) => ({
+          shop_code: p.shop_code || '',
+          name: p.name || '',
+        }))
+
+        // 剔除内存自引用及巨大临时属性，并废弃可能已失真的求解器初始 order 静态索引
         const {
           raw_route,
           points,
           stops,
+          order,
           detailed_polyline,
           amap_path,
           pathCoords,
           ...cleanR
         } = r
+
+        cleanR.stops = cleanStops
 
         if (polyCoords) {
           const encoded = encodePolyline(polyCoords)

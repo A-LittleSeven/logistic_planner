@@ -169,7 +169,10 @@ export function useCanvasVersioning(state, options = {}) {
             hydratedDaily[d] = {
               ...rawDaily[d],
               day: d,
-              routes: hydrateRoutePoints(rawDaily[d].routes, dPts.length ? dPts : stores.value, { defaultReturnToDepot: routeOptions.value?.return_to_depot }),
+              routes: hydrateRoutePoints(rawDaily[d].routes, dPts.length ? dPts : stores.value, {
+                defaultReturnToDepot: routeOptions.value?.return_to_depot,
+                allStores: stores.value,
+              }),
             }
           }
         })
@@ -188,7 +191,10 @@ export function useCanvasVersioning(state, options = {}) {
       } else if (snapshot.routing_data.routes?.length) {
         const fallbackDaily = {
           '全部': {
-            routes: hydrateRoutePoints(snapshot.routing_data.routes, stores.value, { defaultReturnToDepot: routeOptions.value?.return_to_depot }),
+            routes: hydrateRoutePoints(snapshot.routing_data.routes, stores.value, {
+              defaultReturnToDepot: routeOptions.value?.return_to_depot,
+              allStores: stores.value,
+            }),
           },
         }
         unpackDailyResultsPolylines(fallbackDaily, snapshot.routing_data.polyline_pool)

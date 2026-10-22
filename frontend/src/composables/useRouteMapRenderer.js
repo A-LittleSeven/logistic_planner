@@ -209,7 +209,7 @@ export function useRouteMapRenderer() {
           polyPath = r.amap_path
         } else if (r.pathCoords && r.pathCoords.length >= 2) {
           polyPath = r.pathCoords
-        } else {
+        } else if (pts.length > 0) {
           polyPath = [depotPos, ...pts.map((p) => [Number(p.lng ?? p.longitude), Number(p.lat ?? p.latitude)])]
           if (r.return_to_depot === true) {
             polyPath.push(depotPos)
