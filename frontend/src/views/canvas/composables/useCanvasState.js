@@ -97,6 +97,7 @@ export function provideCanvasState(canvasId) {
   })
 
   const activeScheduleStores = computed(() => {
+    if (!hasScheduleComputed.value) return []
     if (selectedScheduleDay.value === '全部') return stores.value
     return stores.value.filter((s) => {
       const dStr = s.schedule_day || s.delivery_days_str || ''
@@ -109,6 +110,7 @@ export function provideCanvasState(canvasId) {
   })
 
   const activeDayPoints = computed(() => {
+    if (!hasScheduleComputed.value) return []
     if (selectedRoutingDay.value === '全部') {
       return stores.value
     }
@@ -174,6 +176,7 @@ export function provideCanvasState(canvasId) {
   })
 
   const expressStores = computed(() => {
+    if (!hasScheduleComputed.value || isRoutingOutdated.value) return []
     if (selectedRoutingDay.value === '全部') {
       return stores.value.filter((s) => isStoreExpressOnDay(s, '全部', stores.value))
     }
@@ -194,7 +197,7 @@ export function provideCanvasState(canvasId) {
     const round = (n) => Math.round(n * 1e5) / 1e5
     clusters.forEach((c) => {
       const idxs = stores.value
-        .map((s, idx) => (s.cluster_id === c.cluster_id ? idx : -1))
+        .map((s, idx) => (Number(s.cluster_id) === Number(c.cluster_id) ? idx : -1))
         .filter((idx) => idx !== -1)
       c.size = idxs.length
       c.point_indices = idxs
@@ -208,8 +211,15 @@ export function provideCanvasState(canvasId) {
           stores.value[idx].center_lng = c.center.lng
           stores.value[idx].center_lat = c.center.lat
         })
+      } else {
+        c.center = null
+        c.cdist_warehouse = 0
       }
     })
+    clusteringResult.value = {
+      ...clusteringResult.value,
+      clusters: [...clusters],
+    }
   }
 
   const invalidateDownstreamStagesFromClustering = (reason = '店群规划已更新') => {
@@ -219,10 +229,27 @@ export function provideCanvasState(canvasId) {
     selectedScheduleDay.value = '周一'
     highlightedClusterId.value = null
 
+    // 深度清洗门店实体层上的下游脏数据 (彻底清除幽灵排班/快递/路线)
+    if (Array.isArray(stores.value)) {
+      stores.value.forEach((s) => {
+        s.schedule_day = ''
+        s.delivery_days_str = ''
+        s.is_express = 0
+        s.express_days = []
+        delete s.route_idx
+        delete s.route_color
+      })
+    }
+
     dailyResults.value = {}
     selectedRoutingDay.value = '周一'
     highlightedRouteIdx.value = null
     expandedRouteIndices.value.clear()
+
+    // 清空路网底层测算内存缓存
+    if (typeof clearRouteMeasureCache === 'function') {
+      clearRouteMeasureCache()
+    }
 
     canvas.stage = 'CLUSTERED'
   }
@@ -234,6 +261,21 @@ export function provideCanvasState(canvasId) {
     selectedRoutingDay.value = '周一'
     highlightedRouteIdx.value = null
     expandedRouteIndices.value.clear()
+
+    // 清除下游路线与快递专属标记
+    if (Array.isArray(stores.value)) {
+      stores.value.forEach((s) => {
+        s.is_express = 0
+        s.express_days = []
+        delete s.route_idx
+        delete s.route_color
+      })
+    }
+
+    // 清空路网底层测算内存缓存
+    if (typeof clearRouteMeasureCache === 'function') {
+      clearRouteMeasureCache()
+    }
 
     canvas.stage = 'SCHEDULED'
   }

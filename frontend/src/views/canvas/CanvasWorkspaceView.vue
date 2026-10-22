@@ -253,6 +253,9 @@ const {
   handleToggleStoreExpress,
   handleBatchSetStoresExpress,
   moveStoreBetweenRoutes,
+  recalculateClusterMetrics,
+  invalidateDownstreamStagesFromClustering,
+  invalidateDownstreamStagesFromScheduling,
 } = canvasState
 
 // Initialize Map Layer Renderer
@@ -334,9 +337,14 @@ window.moveCanvasStore = function (pointIdx, targetClusterVal) {
 
   if (stores.value[pointIdx]) {
     stores.value[pointIdx].cluster_id = targetClusterId
+    // 关闭当前打开的高德信息窗，防止旧弹窗内容滞留
+    const mapObj = mapPanelRef.value?.getMap()
+    if (mapObj && typeof mapObj.clearInfoWindow === 'function') {
+      mapObj.clearInfoWindow()
+    }
     recalculateClusterMetrics()
     invalidateDownstreamStagesFromClustering('单店调区')
-    ElMessage.success(`已将门店移动至店群 ${targetClusterId + 1}，下游周排班与路线数据已同步刷新`)
+    ElMessage.success(`已将门店移动至店群 ${targetClusterId + 1}，下游周排班与路线数据已同步重置`)
     renderMap()
   }
 }
@@ -345,6 +353,10 @@ window.updateCanvasStoreSchedule = function (pointIdx, dayVal) {
   if (stores.value[pointIdx]) {
     stores.value[pointIdx].schedule_day = dayVal
     stores.value[pointIdx].delivery_days_str = dayVal
+    const mapObj = mapPanelRef.value?.getMap()
+    if (mapObj && typeof mapObj.clearInfoWindow === 'function') {
+      mapObj.clearInfoWindow()
+    }
     invalidateDownstreamStagesFromScheduling('单店排班修改')
     ElMessage.success(`已将门店排班修改为 ${dayVal}，下游路线数据已同步刷新`)
     renderMap()
@@ -359,8 +371,18 @@ window.updateCanvasStoreAttr = function (idx, key, val) {
     } else {
       stores.value[idx][key] = val
     }
-    invalidateDownstreamStagesFromScheduling('门店基础属性修改')
-    ElMessage.success(`门店 [${stores.value[idx].name || idx + 1}] 属性已更新，下游路线规划已刷新`)
+    const mapObj = mapPanelRef.value?.getMap()
+    if (mapObj && typeof mapObj.clearInfoWindow === 'function') {
+      mapObj.clearInfoWindow()
+    }
+    if (key === 'frequency') {
+      // 配送频次改变会导致原排班方案模式不再匹配，需级联重置排班
+      invalidateDownstreamStagesFromClustering('门店频次属性修改')
+      ElMessage.success(`门店 [${stores.value[idx].name || idx + 1}] 配送频次已变更，下游排班与路线已同步重置`)
+    } else {
+      invalidateDownstreamStagesFromScheduling('门店基础属性修改')
+      ElMessage.success(`门店 [${stores.value[idx].name || idx + 1}] 属性已更新，下游路线规划已刷新`)
+    }
     renderMap()
   }
 }

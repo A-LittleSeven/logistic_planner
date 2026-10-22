@@ -72,13 +72,18 @@ function addOverlay(o) {
 }
 
 function clearAll() {
-  if (map && overlays.length) {
-    overlays.forEach((o) => {
-      try {
-        if (o.clear) o.clear()
-        map.remove(o)
-      } catch (e) {}
-    })
+  if (map) {
+    try {
+      if (typeof map.clearInfoWindow === 'function') map.clearInfoWindow()
+    } catch (e) {}
+    if (overlays.length) {
+      overlays.forEach((o) => {
+        try {
+          if (o.clear) o.clear()
+          map.remove(o)
+        } catch (e) {}
+      })
+    }
   }
   overlays.length = 0
 }

@@ -9,7 +9,13 @@
       </span>
     </div>
 
-    <div class="daily-stat-bars">
+    <div v-if="!hasScheduledStores" class="empty-schedule-hint">
+      <div style="font-size: 22px; margin-bottom: 4px;">📅</div>
+      <div style="font-size: 12px; font-weight: 600; color: #475569;">暂无有效排班数据</div>
+      <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">店群规划已更新，请点击上方按钮求解全周均衡排班</div>
+    </div>
+
+    <div v-else class="daily-stat-bars">
       <div
         v-for="d in DAYS"
         :key="d"
@@ -87,7 +93,12 @@ const getDayLoadPercent = (day) => {
   return Math.min(100, Math.round((l / (maxDayLoad.value || 1)) * 100))
 }
 
+const hasScheduledStores = computed(() => {
+  return Array.isArray(props.stores) && props.stores.some((s) => Boolean(s.schedule_day || s.delivery_days_str))
+})
+
 const totalWeeklyLoads = computed(() => {
+  if (!hasScheduledStores.value) return 0
   return props.stores.reduce((acc, s) => {
     const avg = Number(s.avg_loads || s.weight || s.demand || 10)
     const freq = Math.max(1, Number(s.frequency || 1))
@@ -100,6 +111,18 @@ const totalWeeklyLoads = computed(() => {
 .schedule-balance-container {
   display: flex;
   flex-direction: column;
+}
+
+.empty-schedule-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 12px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  text-align: center;
 }
 
 .daily-stat-bars {

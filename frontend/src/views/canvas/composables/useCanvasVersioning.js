@@ -147,6 +147,12 @@ export function useCanvasVersioning(state, options = {}) {
     }
 
     scheduleResult.value = unwrapScheduleData(snapshot.schedule_data)
+    if (!scheduleResult.value) {
+      stores.value.forEach((s) => {
+        s.delivery_days_str = ''
+        s.schedule_day = ''
+      })
+    }
 
     if (snapshot.routing_data) {
       if (snapshot.routing_data.daily_results) {
@@ -188,6 +194,13 @@ export function useCanvasVersioning(state, options = {}) {
       }
     } else {
       dailyResults.value = {}
+    }
+
+    if (!dailyResults.value || !Object.keys(dailyResults.value).length) {
+      stores.value.forEach((s) => {
+        s.is_express = 0
+        s.express_days = []
+      })
     }
 
     if (onSnapshotLoaded) {

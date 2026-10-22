@@ -139,9 +139,9 @@ export function useCanvasMapLayers(state) {
 
     stores.value.forEach((p, i) => {
       if (!p.lng || !p.lat) return
-      const cid = p.cluster_id
-      const isThisClusterHl = isAnyClusterHl && Number(highlightedClusterId.value) === Number(cid)
-      const color = (cid !== undefined && cid !== null)
+      const cid = (p.cluster_id !== undefined && p.cluster_id !== null && p.cluster_id !== '') ? Number(p.cluster_id) : null
+      const isThisClusterHl = isAnyClusterHl && Number(highlightedClusterId.value) === cid
+      const color = cid !== null
         ? CLUSTER_COLORS[cid % CLUSTER_COLORS.length]
         : '#94a3b8'
 
@@ -170,7 +170,7 @@ export function useCanvasMapLayers(state) {
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
             <span style="font-size: 11px; font-weight: 600; color: #475569;">所属店群:</span>
             <select onchange="window.moveCanvasStore(${i}, this.value)" style="font-size: 11px; padding: 2px 4px; border-radius: 4px; border: 1px solid #0284c7; background: #f0f9ff; font-weight: 600; color: #0369a1;">
-              ${clusteringResult.value.clusters.map(c => `<option value="${c.cluster_id}" ${c.cluster_id === cid ? 'selected' : ''}>店群 ${c.cluster_id + 1} (${c.size}家)</option>`).join('')}
+              ${clusteringResult.value.clusters.map(c => `<option value="${c.cluster_id}" ${cid !== null && Number(c.cluster_id) === cid ? 'selected' : ''}>店群 ${Number(c.cluster_id) + 1} (${c.size || 0}家)</option>`).join('')}
               <option value="new">+ 新建并加入新店群</option>
             </select>
           </div>
@@ -221,11 +221,12 @@ export function useCanvasMapLayers(state) {
 
     if (clusteringResult.value?.clusters?.length) {
       clusteringResult.value.clusters.forEach((c) => {
-        if (!c.center?.lng || !c.center?.lat) return
-        const isThisCenterHl = isAnyClusterHl && Number(highlightedClusterId.value) === Number(c.cluster_id)
-        const color = CLUSTER_COLORS[c.cluster_id % CLUSTER_COLORS.length]
+        if (!c.size || c.size <= 0 || !c.center?.lng || !c.center?.lat) return
+        const cid = Number(c.cluster_id)
+        const isThisCenterHl = isAnyClusterHl && Number(highlightedClusterId.value) === cid
+        const color = CLUSTER_COLORS[cid % CLUSTER_COLORS.length]
         const { content, offset } = dotHtml({
-          text: `C${c.cluster_id + 1}`,
+          text: `C${cid + 1}`,
           color,
           size: isThisCenterHl ? 36 : 32,
         })
@@ -236,7 +237,7 @@ export function useCanvasMapLayers(state) {
           offset: new A.Pixel(offset[0], offset[1]),
           zIndex: isThisCenterHl ? 260 : 200,
           opacity: isAnyClusterHl ? (isThisCenterHl ? 1.0 : 0.35) : 1.0,
-          title: `店群 ${c.cluster_id + 1} 中心`,
+          title: `店群 ${cid + 1} 中心`,
         })
 
         if (isThisCenterHl) {
