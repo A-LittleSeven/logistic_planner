@@ -11,7 +11,7 @@ from fastapi import HTTPException
 
 from app.core import routing_registry, clustering_registry, schedule_registry
 from app.utils.distance import DistanceProvider
-from app.db.models import DBTaskHistory
+from app.db.models import DBTaskHistory, DBStore
 from app.utils.serialization import safe_json_dumps
 from app.utils.logger import LogUtil
 from app.models.dto.RoutingDTO import (
@@ -59,6 +59,50 @@ class PlanExecutionService:
         except Exception:
             logger.exception(f"写入任务历史记录失败: task_id={task_id}, type={task_type}")
 
+    @staticmethod
+    def _enrich_routing_points(db: Session, points: list) -> None:
+        """在调用路线求解器前，补齐门店缺失的本埠/外埠属性 (is_homepot)"""
+        if not points:
+            return
+
+        missing_points = []
+        for p in points:
+            if getattr(p, "is_depot", False):
+                continue
+            is_hp = getattr(p, "is_homepot", None)
+            if is_hp is None and hasattr(p, "model_extra") and p.model_extra:
+                is_hp = p.model_extra.get("is_homepot")
+            if is_hp is None or is_hp == "":
+                missing_points.append(p)
+
+        if not missing_points:
+            return
+
+        try:
+            db_stores = db.query(DBStore).all()
+            db_store_map = {}
+            for s in db_stores:
+                val = int(s.is_homepot if s.is_homepot is not None else 1)
+                if s.shop_code:
+                    db_store_map[str(s.shop_code).strip()] = val
+                if s.name:
+                    db_store_map[str(s.name).strip()] = val
+
+            for p in missing_points:
+                p_code = (getattr(p, "shop_code", "") or (p.model_extra.get("shop_code") if hasattr(p, "model_extra") and p.model_extra else "") or "").strip()
+                p_name = (getattr(p, "name", "") or "").strip()
+                if p_code and p_code in db_store_map:
+                    p.is_homepot = db_store_map[p_code]
+                elif p_name and p_name in db_store_map:
+                    p.is_homepot = db_store_map[p_name]
+                else:
+                    p.is_homepot = 0
+        except Exception:
+            logger.exception("从数据库补充门店 is_homepot 失败，降级使用默认值 0 (外埠)")
+            for p in missing_points:
+                if getattr(p, "is_homepot", None) is None:
+                    p.is_homepot = 0
+
     @classmethod
     def execute_routing(
         cls, db: Session, req: RoutingSolveRequest, provider: DistanceProvider
@@ -68,6 +112,8 @@ class PlanExecutionService:
             solver = routing_registry.get(req.algorithm)
         except KeyError as e:
             raise HTTPException(status_code=400, detail=str(e))
+
+        cls._enrich_routing_points(db, req.points)
 
         task_id = str(uuid.uuid4())
         param_json = safe_json_dumps(req)
@@ -104,6 +150,8 @@ class PlanExecutionService:
             solver = routing_registry.get("global_optimization")
         except KeyError as e:
             raise HTTPException(status_code=400, detail=str(e))
+
+        cls._enrich_routing_points(db, req.points)
 
         task_id = str(uuid.uuid4())
         param_json = safe_json_dumps(req)

@@ -40,48 +40,24 @@ def solve_or_tools_vrp(req: RoutingSolveRequest, provider: DistanceProvider) -> 
     if count_230 == 0 and count_270 == 0:
         count_230 = len(customers)
 
-    # 智能补全数据库维护的 is_homepot
-    db_store_map = {}
-    missing_codes = [getattr(p, "shop_code", "") or p.name for p in customers if getattr(p, "is_homepot", None) is None]
-    if missing_codes:
-        try:
-            from app.db.database import SessionLocal
-            from app.db.models import DBStore
-            db = SessionLocal()
-            db_stores = db.query(DBStore).all()
-            for s in db_stores:
-                if s.shop_code:
-                    db_store_map[str(s.shop_code).strip()] = int(s.is_homepot if s.is_homepot is not None else 1)
-                if s.name:
-                    db_store_map[str(s.name).strip()] = int(s.is_homepot if s.is_homepot is not None else 1)
-            db.close()
-        except Exception:
-            pass
-
     # Convert customers to stores dict list for route_replanner
     stores_data = []
     for idx, p in enumerate(customers):
         p_name = (p.name or "").strip()
         p_code = (getattr(p, "shop_code", "") or (p.model_extra.get("shop_code") if hasattr(p, "model_extra") and p.model_extra else "") or "").strip()
 
-        # Extract is_homepot safely from RoutePoint or model_extra
+        # Extract is_homepot safely from RoutePoint or model_extra (未提供时默认外埠 0)
         is_hp = getattr(p, "is_homepot", None)
         if (is_hp is None or is_hp == "") and hasattr(p, "model_extra") and p.model_extra:
             is_hp = p.model_extra.get("is_homepot")
 
-        # 未提供时优先从数据库匹配系统维护的值，若无匹配则默认本埠(1)
         if is_hp is None or is_hp == "":
-            if p_code and p_code in db_store_map:
-                is_hp = db_store_map[p_code]
-            elif p_name and p_name in db_store_map:
-                is_hp = db_store_map[p_name]
-            else:
-                is_hp = 1
+            is_hp = 0
 
         try:
             is_hp = int(is_hp)
         except (ValueError, TypeError):
-            is_hp = 1
+            is_hp = 0
 
 
         stores_data.append({
