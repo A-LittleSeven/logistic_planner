@@ -3,7 +3,7 @@
 专职负责 TSP/CVRP 路线求解、多日全局路径规划与方案持久化的 HTTP API 请求/响应模型。
 """
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 class RoutePoint(BaseModel):
@@ -19,7 +19,13 @@ class RoutePoint(BaseModel):
     avg_loads: float = 0.0  # 负载箱数，VRP 需要
     frequency: int = 1
     delivery_days_str: str = ""
-    is_homepot: Optional[int] = Field(default=None, description="是否本埠(1=本埠, 0=外埠)")
+    is_homepot: Optional[int] = Field(default=0, description="是否本埠(1=本埠, 0=外埠)；未提供时默认外埠 0")
+
+    @field_validator("is_homepot", mode="before")
+    @classmethod
+    def _default_homepot(cls, v):
+        """空值/空串归一化为外埠 0，默认填充统一收敛在 DTO 层"""
+        return 0 if (v is None or v == "") else v
 
 
 class TruckProfile(BaseModel):

@@ -3,7 +3,7 @@
 专职负责店群划分、全周排班均衡与方案存盘的 HTTP API 请求/响应模型。
 """
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from pydantic import BaseModel, Field, ConfigDict, model_validator, field_validator
 
 
 class StorePoint(BaseModel):
@@ -17,8 +17,14 @@ class StorePoint(BaseModel):
     lat: float = Field(..., description="纬度")
     avg_loads: float = 1.0
     frequency: int = 1
-    is_homepot: Optional[int] = Field(default=None, description="是否本埠(1=本埠, 0=外埠)")
+    is_homepot: Optional[int] = Field(default=0, description="是否本埠(1=本埠, 0=外埠)；未提供时默认外埠 0")
     delivery_days_str: str = ""
+
+    @field_validator("is_homepot", mode="before")
+    @classmethod
+    def _default_homepot(cls, v):
+        """空值/空串归一化为外埠 0，默认填充统一收敛在 DTO 层"""
+        return 0 if (v is None or v == "") else v
 
 
 class ClusteringSolveRequest(BaseModel):

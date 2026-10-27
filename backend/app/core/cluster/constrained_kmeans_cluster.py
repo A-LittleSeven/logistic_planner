@@ -4,6 +4,9 @@ from scipy.spatial.distance import cdist
 from sklearn.cluster import KMeans
 
 from app.core.cluster.base_cluster import BaseCluster
+from app.utils.logger import LogUtil
+
+logger = LogUtil.get_logger(__name__)
 
 
 class ConstrainedKmeansCluster(BaseCluster):
@@ -175,63 +178,100 @@ class ConstrainedKmeansCluster(BaseCluster):
         return best_cluster
 
     def _local_search_optimization(self, X, labels, delivery_freq, max_iterations=100):
-        """启发式局部搜索优化类内距离"""
+        """启发式局部搜索优化类内距离（增量式评估版）
+
+        原实现每试探一次迁移就全量重算 _calculate_total_distance，
+        复杂度 O(max_iter · n² · k)，几百门店即分钟级并阻塞同步请求线程。
+        本版维护每簇 count/sum/sumsq 统计量，利用
+        SSE_c = Σ||x||² - ||Σx||²/n_c 的分解，单次迁移评估降为 O(1)，
+        整体降为 O(max_iter · n · k)，可接受性判据与原实现一致
+        （迁移后所有簇仍满足最小规模约束 且 总距离下降）。
+        """
         n_samples = X.shape[0]
-        current_labels = labels.copy()
-        best_labels = labels.copy()
-        best_total_distance = self._calculate_total_distance(X, best_labels)
+        k = self.n_clusters
+        if n_samples == 0 or k <= 1:
+            return labels
+
+        rng = np.random
+        freqs = np.asarray(delivery_freq, dtype=float)
+        sq_norms = np.einsum('ij,ij->i', X, X)
+        current_labels = labels.astype(int).copy()
+
+        # ---- 簇统计量初始化 ----
+        counts = np.bincount(current_labels, minlength=k).astype(float)
+        sums = np.vstack([np.bincount(current_labels, weights=X[:, d], minlength=k)
+                          for d in range(X.shape[1])]).T.astype(float)
+        sumsq = np.bincount(current_labels, weights=sq_norms, minlength=k).astype(float)
+
+        def _cluster_max_freq(lbls, c, exclude_idx=None):
+            mask = lbls == c
+            if exclude_idx is not None:
+                mask[exclude_idx] = False
+            m = freqs[mask]
+            return m.max() if m.size else 0.0
+
+        def _sse_of(c_cnt, c_sum, c_sumsq):
+            """单簇 SSE（负数截 0 防浮点误差）"""
+            if c_cnt <= 0:
+                return 0.0
+            return max(0.0, c_sumsq - float(np.dot(c_sum, c_sum)) / c_cnt)
+
+        def _min_size_for(lbls, c, extra_freq=None, exclude_idx=None):
+            """簇 c 的最小规模阈值（extra_freq 模拟加入新点、exclude_idx 模拟移出点后的最大频次）"""
+            mf = _cluster_max_freq(lbls, c, exclude_idx=exclude_idx)
+            if extra_freq is not None:
+                mf = max(mf, extra_freq)
+            return self._get_min_cluster_size([mf] if mf > 0 else [])
 
         for iteration in range(max_iterations):
             improved = False
 
-            for point_idx in np.random.permutation(n_samples):
-                original_cluster = current_labels[point_idx]
-                best_point_cluster = original_cluster
-                best_point_dist = best_total_distance
+            for point_idx in rng.permutation(n_samples):
+                a = current_labels[point_idx]
+                x = X[point_idx]
+                xn = sq_norms[point_idx]
+                f = freqs[point_idx]
 
-                for target_cluster in range(self.n_clusters):
-                    if target_cluster == original_cluster:
-                        continue
-                    current_labels[point_idx] = target_cluster
-                    if self._check_constraints_satisfied(current_labels, delivery_freq):
-                        new_total_distance = self._calculate_total_distance(X, current_labels)
-                        if new_total_distance < best_point_dist:
-                            best_point_dist = new_total_distance
-                            best_point_cluster = target_cluster
+                sse_a = _sse_of(counts[a], sums[a], sumsq[a])
+                sse_b_orig = np.empty(k)
+                for b in range(k):
+                    sse_b_orig[b] = _sse_of(counts[b], sums[b], sumsq[b])
 
-                if best_point_cluster != original_cluster:
-                    current_labels[point_idx] = best_point_cluster
-                    best_total_distance = best_point_dist
-                    best_labels = current_labels.copy()
+                best_b = -1
+                best_gain = -1e-12  # 仅接受严格下降
+
+                # 源簇校验与 b 无关，先做一次（移出后仍满足最小规模）
+                if counts[a] - 1 >= _min_size_for(current_labels, a, exclude_idx=point_idx):
+                    for b in range(k):
+                        if b == a:
+                            continue
+                        # 目标簇加入新点后须满足最小规模（频次上限可能被抬高）
+                        if counts[b] + 1 < _min_size_for(current_labels, b, extra_freq=f):
+                            continue
+
+                        # 增量 SSE：只重算受影响的两个簇
+                        sse_a_new = _sse_of(counts[a] - 1, sums[a] - x, sumsq[a] - xn)
+                        sse_b_new = _sse_of(counts[b] + 1, sums[b] + x, sumsq[b] + xn)
+                        gain = (sse_a_new + sse_b_new) - (sse_a + sse_b_orig[b])
+                        if gain < best_gain:
+                            best_gain = gain
+                            best_b = b
+
+                if best_b >= 0:
+                    # 应用迁移并更新统计量
+                    counts[a] -= 1
+                    sums[a] -= x
+                    sumsq[a] -= xn
+                    counts[best_b] += 1
+                    sums[best_b] += x
+                    sumsq[best_b] += xn
+                    current_labels[point_idx] = best_b
                     improved = True
-                else:
-                    current_labels[point_idx] = original_cluster
 
             if not improved:
                 break
-        return best_labels
 
-    def _calculate_total_distance(self, X, labels):
-        """计算所有聚类内的总距离"""
-        total_distance = 0.0
-        for cluster_id in range(self.n_clusters):
-            cluster_indices = np.where(labels == cluster_id)[0]
-            if len(cluster_indices) > 0:
-                cluster_points = X[cluster_indices]
-                cluster_center = np.mean(cluster_points, axis=0)
-                distances = np.sqrt(np.sum((cluster_points - cluster_center) ** 2, axis=1))
-                total_distance += np.sum(distances)
-        return total_distance
-
-    def _check_constraints_satisfied(self, labels, delivery_freq):
-        """检查当前标签分配是否满足所有约束"""
-        for cluster_id in range(self.n_clusters):
-            cluster_indices = np.where(labels == cluster_id)[0]
-            cluster_freq = delivery_freq[cluster_indices]
-            min_size = self._get_min_cluster_size(cluster_freq)
-            if len(cluster_indices) < min_size:
-                return False
-        return True
+        return current_labels
 
     def fit(self, warehouse_lng=None, warehouse_lat=None):
         """主拟合函数"""
@@ -257,13 +297,14 @@ class ConstrainedKmeansCluster(BaseCluster):
         self.cluster_centers_ = centers
         self.labels_ = labels
 
-        print("开始启发式搜索优化...")
+        logger.info("约束聚类收敛完成，开始启发式局部搜索优化...")
         optimized_labels = self._local_search_optimization(X, labels, delivery_freq)
         self.labels_ = optimized_labels
 
         self.data = self.data.assign(cluster_id=self.labels_)
         self.cluster_center = self.getClusterCenter()
-        self.data = pd.merge(self.data, self.cluster_center, on="cluster_id")
+        # left join 保证标签缺失/异常时不静默丢门店行（与 district_extension_cluster 保持一致）
+        self.data = pd.merge(self.data, self.cluster_center, on="cluster_id", how="left")
 
         if warehouse_lng is not None and warehouse_lat is not None:
             self.cdist_calc(warehouse_lng, warehouse_lat)
