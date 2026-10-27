@@ -85,7 +85,7 @@ def plan_daily_routes_with_or(
         vehicle_fixed_cost: float = 200.0,
         underfill_penalty_per_unit: float = 0.5,
         span_cost_coefficient: int = 0,
-        max_distance_km: float = 600.0,
+        max_distance_km: float = 1500.0,
         max_stop_distance_km: float = 35.0,
         inter_stop_penalty_factor: float = 4.0,
 ) -> list[dict[str, Any]]:
@@ -157,7 +157,7 @@ def _plan_routes_for_group(
         vehicle_fixed_cost: float = 200.0,
         underfill_penalty_per_unit: float = 0.5,
         span_cost_coefficient: int = 0,
-        max_distance_km: float = 600.0,
+        max_distance_km: float = 1500.0,
         max_stop_distance_km: float = 35.0,
         inter_stop_penalty_factor: float = 4.0,
 ) -> list[dict[str, Any]]:
@@ -299,7 +299,7 @@ def _solve_heterogeneous_routes_with_or(
         vehicle_costs_per_km_raw: Sequence[float],
         underfill_penalty_per_unit: float = 0.5,
         span_cost_coefficient: int = 0,
-        max_distance_km: float = 600.0,
+        max_distance_km: float = 1500.0,
         max_stop_distance_km: float = 35.0,
         inter_stop_penalty_factor: float = 4.0,
         time_limit_seconds: int = 60,

@@ -81,7 +81,7 @@ def solve_or_tools_vrp(req: RoutingSolveRequest, provider: DistanceProvider) -> 
     vehicle_fixed_cost = float(opts.get("vehicle_fixed_cost", opts.get("fixed_cost", 200.0)))
     underfill_penalty_per_unit = float(opts.get("underfill_penalty_per_unit", opts.get("underfill_penalty", 0.5)))
     span_cost_coefficient = int(opts.get("span_cost_coefficient", 0))
-    max_distance_km = float(opts.get("max_distance_km", 600.0))
+    max_distance_km = float(opts.get("max_distance_km", 1500.0))
     max_stop_distance_km = float(opts.get("max_stop_distance_km", opts.get("max_relative_distance_km", 35.0)))
     inter_stop_penalty_factor = float(opts.get("inter_stop_penalty_factor", 4.0))
 
