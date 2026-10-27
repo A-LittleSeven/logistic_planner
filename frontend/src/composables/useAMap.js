@@ -1,33 +1,44 @@
+import { ref } from 'vue'
 import AMapLoader from '@amap/amap-jsapi-loader'
 import { systemApi } from '../api/client.js'
 
+/** 响应式密钥版本号，当高德 Key 变更时自增，通知 MapPanel 等地图组件自动重新初始化 */
+export const aMapKeyVersion = ref(0)
+
 export function getAMapConfig() {
-  const customKey = localStorage.getItem('AMAP_USER_KEY')
-  const customSecurity = localStorage.getItem('AMAP_USER_SECURITY')
+  const customKey = typeof localStorage !== 'undefined' ? localStorage.getItem('AMAP_USER_KEY') : null
   const defaultKey = import.meta.env.VITE_AMAP_KEY || ''
-  const defaultSecurity = import.meta.env.VITE_AMAP_SECURITY || ''
 
   const isCustom = !!(customKey && customKey.trim())
   const key = isCustom ? customKey.trim() : defaultKey
-  const security = isCustom ? customSecurity.trim() : defaultSecurity
 
   return {
     key,
-    security,
     isCustom,
     customKey: isCustom ? customKey.trim() : '',
-    customSecurity: isCustom ? customSecurity.trim() : '',
-    defaultKey,
-    defaultSecurity
+    defaultKey
   }
 }
 
-/** 从后端 SQLite 数据库获取高德配置并同步到本地 */
+let initConfigPromise = null
+
+/** 异步初始化高德配置单例，避免顶层调用与 loadAMap 产生竞态 */
+export function initAMapConfig() {
+  if (!initConfigPromise) {
+    initConfigPromise = fetchAMapConfigFromBackend().catch((err) => {
+      console.warn('Failed to initialize AMap config from backend:', err)
+      return getAMapConfig()
+    })
+  }
+  return initConfigPromise
+}
+
+/** 从后端 SQLite 数据库获取高德配置并同步到本地 (仅同步 Key，安全密钥由后端代理托管) */
 export async function fetchAMapConfigFromBackend() {
   try {
     const data = await systemApi.getAmapConfig()
-    if (data.is_custom && data.amap_key && data.amap_secret) {
-      saveAMapConfig(data.amap_key, data.amap_secret)
+    if (data.is_custom && data.amap_key) {
+      saveAMapConfig(data.amap_key)
       return data
     } else {
       resetAMapConfig()
@@ -36,6 +47,7 @@ export async function fetchAMapConfigFromBackend() {
         amap_secret: '',
         amap_secret_md5: '',
         is_custom: false,
+        has_secret: !!data.has_secret,
         message: '使用系统内置默认高德配置'
       }
     }
@@ -45,76 +57,88 @@ export async function fetchAMapConfigFromBackend() {
   return getAMapConfig()
 }
 
-/** 保存配置到后端 SQLite 并同步 MD5 密文摘要 */
+/** 保存配置到后端 SQLite 并同步 Key */
 export async function saveAMapConfigToBackend(key, security) {
   const data = await systemApi.saveAmapConfig({ amap_key: key || '', amap_secret: security || '' })
-  if (data.is_custom && data.amap_key && data.amap_secret) {
-    saveAMapConfig(data.amap_key, data.amap_secret)
+  if (data.is_custom && data.amap_key) {
+    saveAMapConfig(data.amap_key)
   } else {
     resetAMapConfig()
   }
   return data
 }
 
-/** 恢复后端 SQLite 默认配置 (保留底层方法供需要时调用) */
-export async function resetAMapConfigOnBackend() {
-  try {
-    await systemApi.resetAmapConfig()
-  } catch (err) {
-    console.warn('Reset on backend failed:', err)
+/** 重置 AMapLoader 状态并清理注入的脚本，允许切换 Key 后重新加载 */
+export function resetAMapLoader() {
+  if (typeof AMapLoader !== 'undefined' && typeof AMapLoader.reset === 'function') {
+    try {
+      AMapLoader.reset()
+    } catch (e) {
+      console.warn('AMapLoader reset error:', e)
+    }
   }
-  resetAMapConfig()
-  return getAMapConfig()
+  if (typeof document !== 'undefined') {
+    const oldScripts = document.querySelectorAll('script[src*="webapi.amap.com/maps"]')
+    oldScripts.forEach((s) => s.parentNode && s.parentNode.removeChild(s))
+  }
+  AMapPromise = null
+  aMapKeyVersion.value++
 }
 
-export function saveAMapConfig(key, security) {
-  if (key && key.trim()) {
-    localStorage.setItem('AMAP_USER_KEY', key.trim())
+export function saveAMapConfig(key) {
+  const prevKey = getAMapConfig().key
+  const newKey = (key || '').trim()
+
+  if (newKey) {
+    localStorage.setItem('AMAP_USER_KEY', newKey)
   } else {
     localStorage.removeItem('AMAP_USER_KEY')
   }
-  if (security && security.trim()) {
-    localStorage.setItem('AMAP_USER_SECURITY', security.trim())
-  } else {
-    localStorage.removeItem('AMAP_USER_SECURITY')
-  }
+  // 安全加固：彻底清除本地存储中的明文安全密钥
+  localStorage.removeItem('AMAP_USER_SECURITY')
 
-  // Reset loader singleton so subsequent calls load with new key
-  AMapPromise = null
-  const config = getAMapConfig()
-  window._AMapSecurityConfig = {
-    securityJsCode: config.security,
+  // 若 Key 发生变动且已加载过地图，重置 Loader 并触发地图刷新
+  if (prevKey !== newKey || AMapPromise) {
+    resetAMapLoader()
   }
+  ensureAMapSecurityConfig()
 }
 
 export function resetAMapConfig() {
   localStorage.removeItem('AMAP_USER_KEY')
   localStorage.removeItem('AMAP_USER_SECURITY')
-  AMapPromise = null
-  const config = getAMapConfig()
-  window._AMapSecurityConfig = {
-    securityJsCode: config.security,
+  resetAMapLoader()
+  ensureAMapSecurityConfig()
+}
+
+/** 高德 JS API 2.0 官方安全代理规范配置：前端统一使用 serviceHost 转发，杜绝密钥泄露 */
+function ensureAMapSecurityConfig() {
+  if (typeof window !== 'undefined') {
+    window._AMapSecurityConfig = {
+      serviceHost: `${window.location.origin}/_AMapService`,
+    }
   }
 }
 
-// 启动时静默从 SQLite 校验并加载配置
-fetchAMapConfigFromBackend()
-
-// 安全密钥必须在 loader 加载前设置 (高德 JS API 2.0 要求)
-const initialConfig = getAMapConfig()
-window._AMapSecurityConfig = {
-  securityJsCode: initialConfig.security,
+// 初始化时主动清理可能存在的历史本地明文密钥
+if (typeof localStorage !== 'undefined') {
+  localStorage.removeItem('AMAP_USER_SECURITY')
 }
+ensureAMapSecurityConfig()
+
+// 启动时尽早发起初始化请求（受控 Promise 单例，供 loadAMap 等待）
+initAMapConfig()
 
 let AMapPromise = null
 
-/** 加载高德 JS API, 返回 AMap 命名空间 (单例, 失败可重试)。 */
-export function loadAMap() {
+/** 加载高德 JS API, 返回 AMap 命名空间 (单例, 失败可重试)。确保等待后端配置同步完成 */
+export async function loadAMap() {
+  // 核心修复：必须先等待后端配置加载完成，避免竞态导致使用过期的默认 Key
+  await initAMapConfig()
+
   if (!AMapPromise) {
     const config = getAMapConfig()
-    window._AMapSecurityConfig = {
-      securityJsCode: config.security,
-    }
+    ensureAMapSecurityConfig()
     AMapPromise = AMapLoader.load({
       key: config.key,
       version: '2.0',
@@ -127,20 +151,17 @@ export function loadAMap() {
   return AMapPromise
 }
 
-/** 测试指定的 AMap Key 和 Secret 连通性 (若为空则测试当前生效的密钥) */
-export async function testAMapConnection(testKey, testSecurity) {
+/** 测试指定的 AMap Key 连通性 (若为空则测试当前生效的密钥) */
+export async function testAMapConnection(testKey) {
   const config = getAMapConfig()
   const effectiveKey = (testKey && testKey.trim()) ? testKey.trim() : config.key
-  const effectiveSecurity = (testSecurity && testSecurity.trim()) ? testSecurity.trim() : config.security
 
   if (!effectiveKey) {
     throw new Error('未找到可用高德 Key，请检查环境配置或输入自定义 Key')
   }
 
   const startTime = Date.now()
-  window._AMapSecurityConfig = {
-    securityJsCode: effectiveSecurity || '',
-  }
+  ensureAMapSecurityConfig()
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       reject(new Error('高德 API 连接测试超时 (超过 8 秒)，请检查网络或 Key 有效性'))
@@ -162,7 +183,7 @@ export async function testAMapConnection(testKey, testSecurity) {
               success: true,
               latency,
               address: result.regeocode.formattedAddress || '测试地址识别成功',
-              info: 'API 验证通过，Key 与 Security Secret 匹配正常！'
+              info: 'API 验证通过，Key 与后端安全代理匹配正常！'
             })
           } else {
             // Some keys may have geocode quota issues, but if AMap was loaded successfully:
@@ -177,7 +198,7 @@ export async function testAMapConnection(testKey, testSecurity) {
       })
     }).catch((err) => {
       clearTimeout(timeout)
-      reject(new Error((err && err.message) || '高德 JS API 加载失败，请检查 Key 或 Secret 是否填写正确'))
+      reject(new Error((err && err.message) || '高德 JS API 加载失败，请检查 Key 或网络连接'))
     })
   })
 }
@@ -397,6 +418,8 @@ export function useAMap() {
     testAMapConnection,
     fetchAMapConfigFromBackend,
     saveAMapConfigToBackend,
-    resetAMapConfigOnBackend
+    aMapKeyVersion,
+    initAMapConfig,
+    resetAMapLoader
   }
 }

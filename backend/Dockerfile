@@ -1,5 +1,5 @@
-# 使用官方 Python 3.12 官方精简镜像作为基础镜像
-FROM python:3.12-slim
+# 使用官方 Python 3.12 稳定版 (Debian 12 Bookworm) 精简镜像
+FROM python:3.12-slim-bookworm
 
 # 设置 Python 环境变量：禁止生成 .pyc 缓存文件，开启无缓冲标准输出（便于实时查看 docker logs）
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -10,18 +10,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # 工作目录
 WORKDIR /app
 
-# 安装必要的系统运行时依赖
+# 配置国内 Debian 镜像源并安装必要的系统运行时依赖
 # - libgomp1: Google OR-Tools 和 Scipy/Numpy 底层 OpenMP 并行计算依赖
 # - curl: 用于 Docker 容器健康检查 (HEALTHCHECK)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN (sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+     sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list 2>/dev/null || true) && \
+    apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# 利用 Docker 层缓存：先单独复制 requirements.txt 并安装依赖
+# 利用 Docker 层缓存：先单独复制 requirements.txt 并配置国内 PyPI 加速安装依赖
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --extra-index-url https://pypi.org/simple
 
 # 复制后端业务源码
 COPY . .
@@ -39,5 +41,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# 启动 Uvicorn 服务（生产环境监听 0.0.0.0，关闭自动热重载以节约资源）
+# 启动 Uvicorn 服务（生产环境监听 0.0.0.0）
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

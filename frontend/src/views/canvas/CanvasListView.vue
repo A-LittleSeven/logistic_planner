@@ -54,14 +54,12 @@
             clearable
             :prefix-icon="Search"
             style="width: 300px;"
-            @input="filterCanvases"
           />
           <el-select
             v-model="filterStage"
             placeholder="规划阶段"
             clearable
             style="width: 150px;"
-            @change="filterCanvases"
           >
             <el-option label="初始建库 (INIT)" value="INIT" />
             <el-option label="店群已规划 (CLUSTERED)" value="CLUSTERED" />

@@ -250,17 +250,12 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { Expand, Right, WarnTriangleFilled } from '@element-plus/icons-vue'
 import { formatDuration } from '../../utils/constants.js'
 
 const props = defineProps({
   routes: {
     type: Array,
     default: () => [],
-  },
-  allRoutes: {
-    type: Array,
-    default: null,
   },
   expressStores: {
     type: Array,
@@ -353,7 +348,7 @@ const handleDrop = (rIdx, toIdx, event) => {
 
 // 路线调换过滤：只支持当天的路线调换
 const getAvailableTransferRoutes = (currentRoute, currentIdx) => {
-  const allList = props.allRoutes || props.routes
+  const allList = props.routes
   return allList
     .map((route, oIdx) => ({ route, oIdx }))
     .filter(({ route }) => {

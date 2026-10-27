@@ -121,6 +121,32 @@
         </div>
       </div>
 
+      <!-- 坐标系选择与自动检测（仅 Excel 导入模式） -->
+      <div v-if="storeSelectMode === 'excel'" class="coord-system-panel">
+        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <span style="font-size: 13px; color: #64748b;">导入坐标系:</span>
+          <el-radio-group v-model="createImportCoordSystem" size="small" :disabled="importedExcelStores.length === 0">
+            <el-radio-button label="gcj02">GCJ-02（高德/腾讯）</el-radio-button>
+            <el-radio-button label="wgs84">WGS-84（GPS 原始）</el-radio-button>
+          </el-radio-group>
+          <el-button
+            size="small"
+            :loading="createCoordDetecting"
+            :disabled="importedExcelStores.length === 0"
+            @click="runCreateCoordDetect"
+          >
+            自动检测坐标系
+          </el-button>
+        </div>
+        <div v-if="createImportCoordSystem === 'wgs84'" style="font-size: 12px; color: #b45309; margin-top: 6px;">
+          已按 WGS-84 解析：所有坐标已自动转换为高德 GCJ-02 后入库，地图展示与路网测算不再偏移。
+        </div>
+        <div v-if="createCoordDetectResult" :class="['coord-detect-result', createCoordDetectResult.system === 'wgs84' ? 'is-wgs' : 'is-gcj']">
+          <strong>{{ createCoordDetectResult.system === 'wgs84' ? '检测结论：WGS-84（GPS 原始坐标）' : createCoordDetectResult.system === 'gcj02' ? '检测结论：GCJ-02（高德坐标）' : '检测结论：无法自动判断' }}</strong>
+          <span style="margin-left: 8px;">{{ createCoordDetectResult.reason }}</span>
+        </div>
+      </div>
+
       <!-- Mode A: System Store Pool -->
       <div v-if="storeSelectMode === 'system'">
         <div class="store-filter-bar">
@@ -229,7 +255,7 @@
                 (已识别到店群划分)
               </span>
             </span>
-            <el-button size="small" type="danger" link @click="importedExcelStores = []">
+            <el-button size="small" type="danger" link @click="clearExcelImport">
               清空重新上传
             </el-button>
           </div>
@@ -312,6 +338,7 @@ import { Refresh, Upload, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { canvasApi, depotApi, storeApi } from '../../../api/client.js'
 import { parseFileUniversal } from '../../../utils/excelImport.js'
+import { detectCoordinateSystemByAddress } from '../../../utils/coordSystem.js'
 
 const props = defineProps({
   modelValue: {
@@ -339,6 +366,12 @@ const storeFilterHomepot = ref('')
 
 const importedExcelStores = ref([])
 const createExcelInput = ref(null)
+
+// ---- 坐标系选择与自动检测（系统内部统一 GCJ-02，WGS-84 在解析时自动转换） ----
+const createImportCoordSystem = ref('gcj02')
+const createLastRawFile = ref(null)
+const createCoordDetecting = ref(false)
+const createCoordDetectResult = ref(null)
 
 const newCanvasForm = reactive({
   name: '',
@@ -427,6 +460,9 @@ const initWizard = async () => {
   createStep.value = 0
   storeSelectMode.value = 'system'
   importedExcelStores.value = []
+  createLastRawFile.value = null
+  createCoordDetectResult.value = null
+  createImportCoordSystem.value = 'gcj02'
   
   await fetchDepotsAndStores()
 
@@ -508,12 +544,75 @@ const selectAllFilteredStores = () => {
   filteredPoolStores.value.forEach((s) => selectedStoreIds.add(s.id))
 }
 
+// 解析结果落地：更新门店列表并回填中心仓信息（仅首次/空值时回填，不覆盖用户输入）
+const applyExcelPoints = (points) => {
+  importedExcelStores.value = points
+
+  const firstPoint = points[0]
+  if (firstPoint.warehouse_name && (!newCanvasForm.depot_name || newCanvasForm.depot_name === '中心仓')) {
+    newCanvasForm.depot_name = firstPoint.warehouse_name
+  }
+  if (firstPoint.dc_code && !newCanvasForm.dc_code) {
+    newCanvasForm.dc_code = firstPoint.dc_code
+  }
+  if (firstPoint.warehouse_lon && firstPoint.warehouse_lat) {
+    newCanvasForm.depot_lng = Number(firstPoint.warehouse_lon)
+    newCanvasForm.depot_lat = Number(firstPoint.warehouse_lat)
+  }
+}
+
+// 切换坐标系后，用原始文件重新解析，保证门店坐标始终为高德 GCJ-02
+watch(createImportCoordSystem, async (sys) => {
+  createCoordDetectResult.value = null
+  const rawFile = createLastRawFile.value
+  if (!rawFile) return
+  try {
+    const { points } = await parseFileUniversal(rawFile, { coordSystem: sys })
+    if (points && points.length) {
+      applyExcelPoints(points)
+      if (sys === 'wgs84') {
+        ElMessage.success(`已按 WGS-84 解析并转换为高德坐标（共 ${points.length} 条）`)
+      }
+    }
+  } catch (err) {
+    ElMessage.error('重新解析失败: ' + (err.message || err))
+  }
+})
+
+const runCreateCoordDetect = async () => {
+  if (importedExcelStores.value.length === 0) return
+  createCoordDetecting.value = true
+  createCoordDetectResult.value = null
+  try {
+    const result = await detectCoordinateSystemByAddress(importedExcelStores.value, { sampleSize: 5 })
+    createCoordDetectResult.value = result
+    if (result.system !== 'unknown' && result.system !== createImportCoordSystem.value) {
+      ElMessage.warning(`检测到数据为 ${result.system === 'wgs84' ? 'WGS-84（GPS 原始）' : 'GCJ-02（高德）'}，已自动切换导入坐标系并重新解析`)
+      createImportCoordSystem.value = result.system // watch 会自动重新解析
+    } else if (result.system !== 'unknown') {
+      ElMessage.success('检测结果与当前选择一致，无需调整')
+    }
+  } catch (err) {
+    ElMessage.error('坐标系检测失败: ' + (err.message || err))
+  } finally {
+    createCoordDetecting.value = false
+  }
+}
+
+// 清空已解析的导入数据（同时丢弃原始文件与检测结论，避免切换坐标系复活旧文件）
+const clearExcelImport = () => {
+  importedExcelStores.value = []
+  createLastRawFile.value = null
+  createCoordDetectResult.value = null
+  createImportCoordSystem.value = 'gcj02'
+}
+
 const handleCreateExcelImport = async (e) => {
   const file = e.target.files?.[0]
   if (!file) return
 
   try {
-    const { points, warnings } = await parseFileUniversal(file)
+    const { points, warnings } = await parseFileUniversal(file, { coordSystem: createImportCoordSystem.value })
     if (!points || !points.length) {
       ElMessage.error('未能识别有效门店数据，请检查经纬度与表头')
       return
@@ -523,20 +622,10 @@ const handleCreateExcelImport = async (e) => {
       ElMessage.warning(`解析提示: ${warnings[0]}`)
     }
 
-    importedExcelStores.value = points
+    createLastRawFile.value = file
+    createCoordDetectResult.value = null
+    applyExcelPoints(points)
     ElMessage.success(`成功解析并载入 ${points.length} 家门店数据`)
-
-    const firstPoint = points[0]
-    if (firstPoint.warehouse_name && (!newCanvasForm.depot_name || newCanvasForm.depot_name === '中心仓')) {
-      newCanvasForm.depot_name = firstPoint.warehouse_name
-    }
-    if (firstPoint.dc_code && !newCanvasForm.dc_code) {
-      newCanvasForm.dc_code = firstPoint.dc_code
-    }
-    if (firstPoint.warehouse_lon && firstPoint.warehouse_lat) {
-      newCanvasForm.depot_lng = Number(firstPoint.warehouse_lon)
-      newCanvasForm.depot_lat = Number(firstPoint.warehouse_lat)
-    }
   } catch (err) {
     ElMessage.error(`Excel解析失败: ${err.message || err}`)
   } finally {
@@ -645,5 +734,33 @@ const submitCreateCanvas = async () => {
 .store-filter-right {
   display: flex;
   gap: 8px;
+}
+
+.coord-system-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 10px 0 8px;
+  background: #fbfdff;
+}
+
+.coord-detect-result {
+  font-size: 12px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  line-height: 1.5;
+}
+
+.coord-detect-result.is-wgs {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.coord-detect-result.is-gcj {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
 }
 </style>

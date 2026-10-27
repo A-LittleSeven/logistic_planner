@@ -62,7 +62,7 @@
               <el-input
                 v-model="form.security"
                 :type="hideSecret ? 'password' : 'text'"
-                placeholder="（选填）留空则系统自动使用内置默认密钥"
+                :placeholder="configState.isCustom && configState.secret_md5 ? '已配置安全密钥（留空保持不变）' : '（选填）留空则系统自动使用内置默认密钥'"
                 clearable
                 show-password
               >
@@ -74,7 +74,7 @@
                 </template>
               </el-input>
               <div class="field-hint">
-                🔒 高德 JS API 2.0 规范要求。填写后由后端 SQLite 安全存储并进行 MD5 密文加密。
+                🔒 高德 JS API 2.0 官方 serviceHost 规范。安全密钥由后端安全代理托管与转发，绝不向浏览器前端暴露明文。
               </div>
             </el-form-item>
 
@@ -253,7 +253,6 @@ import {
   Lock,
   Check,
   Connection,
-  Refresh,
   CircleCheckFilled,
   CircleCloseFilled,
   Cpu,
@@ -262,13 +261,12 @@ import {
   Location,
   InfoFilled
 } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import AppPageHeader from '../../components/common/AppPageHeader.vue'
 import {
   testAMapConnection,
   fetchAMapConfigFromBackend,
-  saveAMapConfigToBackend,
-  resetAMapConfigOnBackend
+  saveAMapConfigToBackend
 } from '../../composables/useAMap.js'
 
 const form = reactive({
@@ -294,12 +292,12 @@ const loadCurrentConfig = async () => {
     configState.isCustom = !!data.is_custom
     configState.secret_md5 = data.amap_secret_md5 || ''
 
-    // 仅在用户已配置自定义密钥时在输入框展示，使用系统默认密钥时保持为空
+    // 仅在用户已配置自定义密钥时在输入框展示 Key；安全密钥严禁明文回显，保护敏感信息
     if (configState.isCustom) {
       configState.key = data.amap_key || ''
-      configState.security = data.amap_secret || ''
+      configState.security = ''
       form.key = configState.key
-      form.security = configState.security
+      form.security = ''
     } else {
       configState.key = ''
       configState.security = ''
@@ -332,13 +330,13 @@ const handleSaveConfig = async () => {
     return
   }
 
-  // 若填写了其中一项，另一项也必须填写
+  // 若填写了 Key，首次配置需提供安全密钥；若已有配置则允许留空保持不变
   if (!k) {
     ElMessage.warning('请输入有效的高德 Web端 Key')
     return
   }
-  if (!s) {
-    ElMessage.warning('请输入与 Key 配对的高德安全密钥 (Security Secret)')
+  if (!s && !configState.isCustom) {
+    ElMessage.warning('首次配置请输入与 Key 配对的高德安全密钥 (Security Secret)')
     return
   }
 
@@ -347,7 +345,7 @@ const handleSaveConfig = async () => {
     const data = await saveAMapConfigToBackend(k, s)
     configState.secret_md5 = data.amap_secret_md5 || ''
     configState.isCustom = true
-    ElMessage.success('用户自定义 Key 与安全密钥已成功加密并保存至 SQLite！')
+    ElMessage.success('用户自定义 Key 与安全配置已保存至后端 SQLite！')
     await loadCurrentConfig()
   } catch (err) {
     ElMessage.error('保存失败: ' + err.message)
@@ -361,7 +359,7 @@ const handleTestConnection = async () => {
   testResult.value = null
 
   try {
-    const res = await testAMapConnection((form.key || '').trim(), (form.security || '').trim())
+    const res = await testAMapConnection((form.key || '').trim())
     testResult.value = {
       success: true,
       latency: res.latency,

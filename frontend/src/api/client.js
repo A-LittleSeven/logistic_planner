@@ -16,17 +16,12 @@ http.interceptors.response.use(
 
 export const routingApi = {
   solve: (data) => http.post('/api/routing/solve', data),
-  solveGlobal: (data) => http.post('/api/routing/solve_global', data),
-  savePlan: (data) => http.post('/api/routing/save_plan', data),
-  algorithms: () => http.get('/api/routing/algorithms'),
 }
 
 export const clusteringApi = {
   solve: (data) => http.post('/api/clustering/solve', data),
   solveSchedule: (data) => http.post('/api/clustering/solve_schedule', data),
-  savePlan: (data) => http.post('/api/clustering/save_plan', data),
   saveSchedule: (data) => http.post('/api/clustering/save_schedule', data),
-  algorithms: () => http.get('/api/clustering/algorithms'),
   scheduleAlgorithms: () => http.get('/api/clustering/schedule/algorithms'),
 }
 
@@ -50,12 +45,10 @@ export const depotApi = {
   update: (id, data) => http.put(`/api/depot/${id}`, data),
   delete: (id) => http.delete(`/api/depot/${id}`),
   setDefault: (id) => http.post(`/api/depot/${id}/set_default`),
-  getDefault: () => http.get('/api/depot/default'),
 }
 
 export const vehicleApi = {
   list: () => http.get('/api/vehicle/'),
-  get: (id) => http.get(`/api/vehicle/${id}`),
   create: (data) => http.post('/api/vehicle/', data),
   update: (id, data) => http.put(`/api/vehicle/${id}`, data),
   delete: (id) => http.delete(`/api/vehicle/${id}`),
@@ -63,7 +56,6 @@ export const vehicleApi = {
 
 export const storeApi = {
   list: (params) => http.get('/api/store/', { params: { limit: 5000, ...params } }),
-  get: (id) => http.get(`/api/store/${id}`),
   create: (data) => http.post('/api/store/', data),
   update: (id, data) => http.put(`/api/store/${id}`, data),
   delete: (id) => http.delete(`/api/store/${id}`),

@@ -1,5 +1,6 @@
 // Excel & CSV 批量导入解析引擎 (使用 XLSX + 智能表头映射与编码自适应)
 import * as XLSX from 'xlsx'
+import { wgs84ToGcj02, validateCoordinatePoints } from './coordSystem.js'
 
 // 表头别名映射表 (不区分大小写，自动去空格与下划线)
 const FIELD_ALIASES = {
@@ -61,8 +62,13 @@ function buildColumnIndexMap(headers) {
 
 /**
  * 将解析出的二维数据映射为规范的 StoreNode 属性点集合
+ * @param {Array<Array>} rows 二维数据（首行为表头）
+ * @param {Object} options
+ *   - coordSystem: 'gcj02'（默认，高德坐标，原样保留）| 'wgs84'（GPS 原始坐标，自动转换为 GCJ-02）
+ *     系统内部（高德地图渲染 + 货车路网测算）统一使用 GCJ-02。
  */
-export function map2DArrayToStores(rows) {
+export function map2DArrayToStores(rows, options = {}) {
+  const coordSystem = options.coordSystem === 'wgs84' ? 'wgs84' : 'gcj02'
   const warnings = []
   if (!rows || rows.length < 2) {
     return { points: [], warnings: ['文件为空或无有效数据行'] }
@@ -100,6 +106,15 @@ export function map2DArrayToStores(rows) {
     if (isNaN(lng) || isNaN(lat) || !isFinite(lng) || !isFinite(lat)) {
       warnings.push(`第 ${r + 1} 行经纬度包含非数字字符，已自动跳过`)
       continue
+    }
+
+    // 坐标系归一化：WGS-84 (GPS 原始) -> GCJ-02 (高德)；境外坐标 wgs84ToGcj02 原样返回
+    let finalLng = lng
+    let finalLat = lat
+    if (coordSystem === 'wgs84') {
+      const [gLng, gLat] = wgs84ToGcj02(lng, lat)
+      finalLng = Number(gLng.toFixed(6))
+      finalLat = Number(gLat.toFixed(6))
     }
 
     // 提取字段
@@ -201,10 +216,12 @@ export function map2DArrayToStores(rows) {
       dept_id: deptId || finalCode,
       district: district || districtSub || cityName || '',
       warzone,
-      lng,
-      lat,
-      longitude: lng,
-      latitude: lat,
+      lng: finalLng,
+      lat: finalLat,
+      longitude: finalLng,
+      latitude: finalLat,
+      // 记录坐标系来源，便于后续溯源（入库前由调用方剔除或后端忽略）
+      coord_source: coordSystem === 'wgs84' ? 'wgs84_converted_to_gcj02' : 'gcj02',
       avg_loads: avgLoads,
       weight: avgLoads,
       frequency,
@@ -222,7 +239,9 @@ export function map2DArrayToStores(rows) {
     }
 
     // 保存所有原始属性用于通用透传
+    // 注意：跳过经纬度列，避免字符串原始值覆盖上面已归一化（含坐标系转换）的数值
     rawHeaders.forEach((h, cIdx) => {
+      if (cIdx === colMap.lng || cIdx === colMap.lat) return
       if (h && row[cIdx] !== undefined && row[cIdx] !== null) {
         pt[h] = cleanStr(row[cIdx])
       }
@@ -290,23 +309,27 @@ export function map2DArrayToStores(rows) {
     }
   }
 
+  // 坐标静态校验（范围 / 中国域 / 经纬度互换 / 度分格式），无论何种坐标系均执行
+  const coordWarnings = validateCoordinatePoints(points)
+  coordWarnings.forEach((w) => warnings.push(w))
+
   return { points, warnings }
 }
 
 /**
  * 解析 Excel (.xlsx, .xls) 或 CSV 文件
  */
-export async function parseFileUniversal(file) {
+export async function parseFileUniversal(file, options = {}) {
   const isCSV = file.name.toLowerCase().endsWith('.csv')
 
   if (isCSV) {
-    return parseCSVFile(file)
+    return parseCSVFile(file, options)
   } else {
-    return parseExcelFile(file)
+    return parseExcelFile(file, options)
   }
 }
 
-export async function parseExcelFile(file) {
+export async function parseExcelFile(file, options = {}) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -319,7 +342,7 @@ export async function parseExcelFile(file) {
         }
         const worksheet = workbook.Sheets[firstSheetName]
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' })
-        resolve(map2DArrayToStores(rows))
+        resolve(map2DArrayToStores(rows, options))
       } catch (err) {
         reject(new Error('Excel 文件解析失败: ' + (err.message || err)))
       }
@@ -329,7 +352,7 @@ export async function parseExcelFile(file) {
   })
 }
 
-export async function parseCSVFile(file) {
+export async function parseCSVFile(file, options = {}) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -349,7 +372,7 @@ export async function parseCSVFile(file) {
         const firstSheetName = workbook.SheetNames[0]
         const worksheet = workbook.Sheets[firstSheetName]
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' })
-        resolve(map2DArrayToStores(rows))
+        resolve(map2DArrayToStores(rows, options))
       } catch (err) {
         reject(new Error('CSV 文件解析失败: ' + (err.message || err)))
       }

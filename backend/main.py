@@ -20,6 +20,7 @@ from app.api import (
     depot_router,
     system_router,
     canvas_router,
+    amap_proxy_router,
 )
 from app.db.database import Base, engine
 
@@ -56,6 +57,7 @@ app.include_router(vehicle_router.router, prefix="/api/vehicle", tags=["车辆�
 app.include_router(depot_router.router, prefix="/api/depot", tags=["起点管理"])
 app.include_router(history_router.router, prefix="/api/history", tags=["历史记录"])
 app.include_router(system_router.router, prefix="/api/system", tags=["系统管理"])
+app.include_router(amap_proxy_router.router, prefix="/_AMapService", tags=["高德安全代理"])
 
 
 

@@ -428,12 +428,17 @@ export function useCanvasMapLayers(state) {
   const renderMap = async (shouldFit = false) => {
     if (!mapPanelRef.value) return
     if (!amapInstance.value) {
-      if (mapPanelRef.value.whenReady) {
-        amapInstance.value = await mapPanelRef.value.whenReady()
-      } else if (mapPanelRef.value.getAmap) {
-        amapInstance.value = await mapPanelRef.value.getAmap()
-      } else {
-        amapInstance.value = await loadAMap()
+      try {
+        if (mapPanelRef.value.whenReady) {
+          amapInstance.value = await mapPanelRef.value.whenReady()
+        } else if (mapPanelRef.value.getAmap) {
+          amapInstance.value = await mapPanelRef.value.getAmap()
+        } else {
+          amapInstance.value = await loadAMap()
+        }
+      } catch (err) {
+        console.warn('renderMap waiting for map initialization failed:', err)
+        return
       }
     }
     const A = amapInstance.value

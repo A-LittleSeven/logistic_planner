@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     distance_provider: str = "haversine"
     amap_web_service_key: str = ""
+    amap_security_secret: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

@@ -138,7 +138,6 @@
     <div v-if="routes.length || expressStores.length" class="panel-card">
       <RoutePlanList
         :routes="routes"
-        :all-routes="routes"
         :express-stores="expressStores"
         :highlighted-route-idx="highlightedRouteIdx"
         :loading-amap-route-key="loadingAmapRouteKey"

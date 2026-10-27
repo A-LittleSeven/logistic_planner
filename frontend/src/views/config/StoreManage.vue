@@ -321,7 +321,7 @@
             <strong>核心字段说明：</strong>
             <span style="color: #ef4444;">*门店编号</span>（唯一编码）、
             <span style="color: #ef4444;">*门店名称</span>、
-            <span style="color: #ef4444;">*经度 / *纬度</span>（必填，高德/WGS84坐标）、
+            <span style="color: #ef4444;">*经度 / *纬度</span>（必填，默认按高德 GCJ-02 坐标解析；若为 GPS 原始 WGS-84 坐标，请在下方“导入坐标系”中选择或点“自动检测”）、
             <span>所属仓库</span>（如 南宁中心仓）、
             <span>所属店群</span>（如 1）、
             <span>日均箱数</span>（需求量）、
@@ -355,12 +355,38 @@
           </el-upload>
         </div>
 
-        <div v-if="parsedList.length > 0" style="display: flex; justify-content: flex-end; align-items: center; margin: 16px 0 8px;">
+        <div style="display: flex; justify-content: flex-end; align-items: center; margin: 16px 0 4px; flex-wrap: wrap; gap: 6px;">
           <span style="font-size: 13px; color: #64748b; margin-right: 12px;">导入模式:</span>
           <el-radio-group v-model="importMode" size="small">
             <el-radio-button label="overwrite">清空并覆盖现有数据</el-radio-button>
             <el-radio-button label="append">追加 / 更新现有数据</el-radio-button>
           </el-radio-group>
+        </div>
+
+        <!-- 坐标系选择与自动检测 -->
+        <div class="coord-system-panel">
+          <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <span style="font-size: 13px; color: #64748b;">导入坐标系:</span>
+            <el-radio-group v-model="importCoordSystem" size="small" :disabled="parsedList.length === 0">
+              <el-radio-button label="gcj02">GCJ-02（高德/腾讯）</el-radio-button>
+              <el-radio-button label="wgs84">WGS-84（GPS 原始）</el-radio-button>
+            </el-radio-group>
+            <el-button
+              size="small"
+              :loading="coordDetecting"
+              :disabled="parsedList.length === 0"
+              @click="runCoordSystemDetect"
+            >
+              自动检测坐标系
+            </el-button>
+          </div>
+          <div v-if="importCoordSystem === 'wgs84'" style="font-size: 12px; color: #b45309; margin-top: 6px;">
+            已按 WGS-84 解析：所有坐标已自动转换为高德 GCJ-02 后入库，地图展示与路网测算不再偏移。
+          </div>
+          <div v-if="coordDetectResult" :class="['coord-detect-result', coordDetectResult.system === 'wgs84' ? 'is-wgs' : 'is-gcj']">
+            <strong>{{ coordDetectResult.system === 'wgs84' ? '检测结论：WGS-84（GPS 原始坐标）' : coordDetectResult.system === 'gcj02' ? '检测结论：GCJ-02（高德坐标）' : '检测结论：无法自动判断' }}</strong>
+            <span style="margin-left: 8px;">{{ coordDetectResult.reason }}</span>
+          </div>
         </div>
 
         <!-- Preview Table -->
@@ -418,11 +444,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { Plus, Refresh, Search, Upload, Download, Delete, UploadFilled, Document, ArrowDown } from '@element-plus/icons-vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { Plus, Refresh, Search, Upload, Download, Delete, UploadFilled, Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import * as XLSX from 'xlsx'
 import { parseFileUniversal } from '../../utils/excelImport.js'
+import { detectCoordinateSystemByAddress } from '../../utils/coordSystem.js'
 import { storeApi, depotApi } from '../../api/client.js'
 import StatCard from '../../components/common/StatCard.vue'
 
@@ -678,7 +705,52 @@ const handleClearAll = async () => {
 const openImportDialog = () => {
   parsedList.value = []
   parseWarnings.value = []
+  lastRawImportFile.value = null
+  coordDetectResult.value = null
   importDialogVisible.value = true
+}
+
+// ---- 坐标系选择与自动检测（系统内部统一 GCJ-02，WGS-84 在解析时自动转换） ----
+const importCoordSystem = ref('gcj02')
+const lastRawImportFile = ref(null)
+const coordDetecting = ref(false)
+const coordDetectResult = ref(null)
+
+// 切换坐标系后，用原始文件重新解析，保证预览与入库数据一致
+watch(importCoordSystem, async (sys) => {
+  coordDetectResult.value = null
+  const rawFile = lastRawImportFile.value
+  if (!rawFile) return
+  try {
+    const { points, warnings } = await parseFileUniversal(rawFile, { coordSystem: sys })
+    parsedList.value = points || []
+    parseWarnings.value = warnings || []
+    if (sys === 'wgs84') {
+      ElMessage.success(`已按 WGS-84 解析并转换为高德坐标（共 ${parsedList.value.length} 条）`)
+    }
+  } catch (err) {
+    ElMessage.error('重新解析失败: ' + (err.message || err))
+  }
+})
+
+const runCoordSystemDetect = async () => {
+  if (parsedList.value.length === 0) return
+  coordDetecting.value = true
+  coordDetectResult.value = null
+  try {
+    const result = await detectCoordinateSystemByAddress(parsedList.value, { sampleSize: 5 })
+    coordDetectResult.value = result
+    if (result.system !== 'unknown' && result.system !== importCoordSystem.value) {
+      ElMessage.warning(`检测到数据为 ${result.system === 'wgs84' ? 'WGS-84（GPS 原始）' : 'GCJ-02（高德）'}，已自动切换导入坐标系并重新解析`)
+      importCoordSystem.value = result.system // watch 会自动重新解析
+    } else if (result.system !== 'unknown') {
+      ElMessage.success('检测结果与当前选择一致，无需调整')
+    }
+  } catch (err) {
+    ElMessage.error('坐标系检测失败: ' + (err.message || err))
+  } finally {
+    coordDetecting.value = false
+  }
 }
 
 const handleFileSelected = async (fileObj) => {
@@ -686,8 +758,10 @@ const handleFileSelected = async (fileObj) => {
   if (!rawFile) return
 
   try {
-    const { points, warnings } = await parseFileUniversal(rawFile)
+    const { points, warnings } = await parseFileUniversal(rawFile, { coordSystem: importCoordSystem.value })
     parseWarnings.value = warnings || []
+    lastRawImportFile.value = rawFile
+    coordDetectResult.value = null
 
     if (!points || points.length === 0) {
       ElMessage.warning(warnings[0] || '未在文件中识别到有效门店经纬度数据，请检查文件格式')
@@ -717,14 +791,6 @@ const submitBatchImport = async () => {
     ElMessage.error(err.message)
   } finally {
     importing.value = false
-  }
-}
-
-const handleTemplateDownload = (cmd) => {
-  if (cmd === 'xlsx') {
-    downloadTemplateExcel()
-  } else {
-    downloadTemplateCSV()
   }
 }
 
@@ -999,5 +1065,33 @@ onMounted(() => {
 .warning-box ul {
   margin: 4px 0 0 16px;
   padding: 0;
+}
+
+.coord-system-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 10px 0 8px;
+  background: #fbfdff;
+}
+
+.coord-detect-result {
+  font-size: 12px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  line-height: 1.5;
+}
+
+.coord-detect-result.is-wgs {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.coord-detect-result.is-gcj {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
 }
 </style>

@@ -301,25 +301,6 @@ export function useRouteOptimizer() {
   }
 
   /**
-   * 调整路线内单个站点的到店访问次序
-   */
-  const moveStoreOrder = (route, storeSeq, direction) => {
-    if (!route) return false
-    const pts = route.points || route.stops
-    if (!pts || !Array.isArray(pts)) return false
-
-    const newIndex = storeSeq + direction
-    if (newIndex < 0 || newIndex >= pts.length) return false
-
-    const temp = pts[storeSeq]
-    pts[storeSeq] = pts[newIndex]
-    pts[newIndex] = temp
-
-    clearRouteMeasureCache(route)
-    return true
-  }
-
-  /**
    * 解析路线的本外埠属性 (1 本埠 / 0 外埠)，若无则尝试通过首个站点的属性判断
    */
   const resolveHomepot = (route, fallbackStores = []) => {
@@ -457,7 +438,6 @@ export function useRouteOptimizer() {
     removeExpressFromRoutes,
     resolveHomepot,
     hydrateRoutePoints,
-    moveStoreOrder,
     recalculateRouteMetrics,
   }
 }

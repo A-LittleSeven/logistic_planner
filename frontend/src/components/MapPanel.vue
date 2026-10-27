@@ -2,18 +2,22 @@
   <div class="map-panel">
     <div ref="container" class="map-container"></div>
     <div v-if="error" class="map-error">
-      <div>
-        <strong>地图加载失败</strong>
-        <p>{{ error }}</p>
-        <p class="hint">请在 frontend/.env 配置 VITE_AMAP_KEY 与 VITE_AMAP_SECURITY 后重启 dev。</p>
+      <div style="text-align: center;">
+        <strong style="display: block; font-size: 16px; margin-bottom: 6px;">地图加载失败</strong>
+        <p style="color: #ef4444; margin-bottom: 8px;">{{ error }}</p>
+        <p class="hint">请检查高德 Key 配置或网络环境</p>
+        <el-button type="primary" size="small" style="margin-top: 12px;" @click="initMap">
+          重试加载地图
+        </el-button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { loadAMap } from '../composables/useAMap.js'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import { loadAMap, aMapKeyVersion } from '../composables/useAMap.js'
 
 const props = defineProps({
   center: { type: Array, default: () => [116.397428, 39.90923] }, // 北京
@@ -28,11 +32,20 @@ let AMap = null
 const overlays = []
 const readyResolvers = []
 
-const emit = defineEmits(['map-ready'])
+const emit = defineEmits(['map-ready', 'map-error'])
 
-onMounted(async () => {
+const initMap = async () => {
+  if (map) {
+    try {
+      map.destroy()
+    } catch (e) {}
+    map = null
+  }
+  error.value = ''
+
   try {
     AMap = await loadAMap()
+    if (!container.value) return
     map = new AMap.Map(container.value, {
       center: props.center,
       zoom: props.zoom,
@@ -40,11 +53,27 @@ onMounted(async () => {
     })
     map.addControl(new AMap.Scale())
     map.addControl(new AMap.ToolBar({ position: 'RB' }))
-    readyResolvers.forEach((r) => r(AMap))
+    readyResolvers.forEach(({ resolve }) => resolve && resolve(AMap))
     readyResolvers.length = 0
     emit('map-ready', { map, AMap })
   } catch (e) {
-    error.value = e?.message || String(e)
+    const err = e instanceof Error ? e : new Error(String(e))
+    error.value = err.message || String(err)
+    readyResolvers.forEach(({ reject }) => reject && reject(err))
+    readyResolvers.length = 0
+    emit('map-error', err)
+    ElMessage.error(`高德地图加载失败: ${error.value}`)
+  }
+}
+
+onMounted(() => {
+  initMap()
+})
+
+// 监听高德 Key 版本变化，当密钥更新后自动刷新地图实例
+watch(aMapKeyVersion, (newVer, oldVer) => {
+  if (oldVer !== undefined && oldVer !== 0) {
+    initMap()
   }
 })
 
@@ -57,9 +86,10 @@ onBeforeUnmount(() => {
 
 /** 父组件调用, 返回 AMap 命名空间 (用于构造 Marker / Polyline 等)。 */
 function whenReady() {
-  return new Promise((resolve) => {
-    if (AMap) resolve(AMap)
-    else readyResolvers.push(resolve)
+  return new Promise((resolve, reject) => {
+    if (AMap && map) resolve(AMap)
+    else if (error.value) reject(new Error(error.value))
+    else readyResolvers.push({ resolve, reject })
   })
 }
 
@@ -95,7 +125,7 @@ function fitView(padding = [60, 60, 60, 60]) {
 const getMap = () => map
 const getAmap = () => whenReady()
 
-defineExpose({ whenReady, getAmap, addOverlay, clearAll, fitView, getMap })
+defineExpose({ whenReady, getAmap, addOverlay, clearAll, fitView, getMap, reload: initMap })
 </script>
 
 <style scoped>
