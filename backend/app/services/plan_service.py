@@ -16,7 +16,6 @@ from app.utils.serialization import safe_json_dumps
 from app.utils.logger import LogUtil
 from app.models.dto.RoutingDTO import (
     RoutingSolveRequest,
-    GlobalRoutingSolveRequest,
     SaveRoutingPlanRequest,
 )
 from app.models.dto.ClusteringDTO import (
@@ -88,42 +87,6 @@ class PlanExecutionService:
                 db,
                 task_id=task_id,
                 task_type="ROUTING",
-                save_type="AUTO",
-                status="FAILED",
-                parameters=param_json,
-                error_message=str(e),
-            )
-            raise HTTPException(status_code=400, detail=str(e))
-
-    @classmethod
-    def execute_global_routing(
-        cls, db: Session, req: GlobalRoutingSolveRequest, provider: DistanceProvider
-    ) -> Dict[str, Any]:
-        """执行全周多日全局路线规划求解并归档历史"""
-        try:
-            solver = routing_registry.get("global_optimization")
-        except KeyError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-
-        task_id = str(uuid.uuid4())
-        param_json = safe_json_dumps(req)
-        try:
-            res = solver(req, provider)
-            cls._record_task_history(
-                db,
-                task_id=task_id,
-                task_type="GLOBAL_ROUTING",
-                save_type="AUTO",
-                status="SUCCESS",
-                parameters=param_json,
-                result=safe_json_dumps(res),
-            )
-            return res
-        except Exception as e:
-            cls._record_task_history(
-                db,
-                task_id=task_id,
-                task_type="GLOBAL_ROUTING",
                 save_type="AUTO",
                 status="FAILED",
                 parameters=param_json,

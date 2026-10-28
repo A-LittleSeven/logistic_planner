@@ -77,26 +77,6 @@ class RoutingSolveResponse(BaseModel):
     return_to_depot: Optional[bool] = None
 
 
-class GlobalRoutingSolveRequest(BaseModel):
-    points: List[RoutePoint]
-    trucks: List[TruckProfile] = Field(default_factory=list)
-    depot_lng: float = 108.318344
-    depot_lat: float = 22.846367
-
-
-class DailyRoutingResult(BaseModel):
-    day: str  # "周一", "周二" 等
-    routes: List[RouteResult]
-    total_distance: float
-    total_stores: int
-
-
-class GlobalRoutingSolveResponse(BaseModel):
-    algorithm: str = "global_optimization"
-    daily_results: Dict[str, DailyRoutingResult]
-    points: List[dict]  # 门店点信息，包含更新后的 delivery_days_str
-
-
 class SaveRoutingPlanRequest(BaseModel):
     title: str = "路线规划方案"
     depot_name: Optional[str] = "中心仓"

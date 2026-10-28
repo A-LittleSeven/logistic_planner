@@ -13,8 +13,6 @@ from app.db.database import get_db
 from app.models.dto.RoutingDTO import (
     RoutingSolveRequest,
     RoutingSolveResponse,
-    GlobalRoutingSolveRequest,
-    GlobalRoutingSolveResponse,
     SaveRoutingPlanRequest,
 )
 from app.solvers import routing_solver  # noqa: F401  导入即注册求解器
@@ -35,15 +33,6 @@ def solve(
     db: Session = Depends(get_db),
 ):
     return PlanExecutionService.execute_routing(db, req, provider)
-
-
-@router.post("/solve_global", response_model=GlobalRoutingSolveResponse, summary="全周全局路线规划求解")
-def solve_global(
-    req: GlobalRoutingSolveRequest,
-    provider: DistanceProvider = Depends(get_distance_provider),
-    db: Session = Depends(get_db),
-):
-    return PlanExecutionService.execute_global_routing(db, req, provider)
 
 
 @router.post("/save_plan", summary="保存路线规划方案至历史存盘")

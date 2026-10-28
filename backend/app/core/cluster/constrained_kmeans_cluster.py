@@ -301,6 +301,17 @@ class ConstrainedKmeansCluster(BaseCluster):
         optimized_labels = self._local_search_optimization(X, labels, delivery_freq)
         self.labels_ = optimized_labels
 
+        # 局部搜索迁移了门店归属，须按优化后标签重算簇中心，
+        # 否则输出的 center_lgt/center_lat 与簇内实际门店位置偏离
+        new_centers = np.zeros_like(self.cluster_centers_)
+        for j in range(self.n_clusters):
+            cluster_points = X[self.labels_ == j]
+            if len(cluster_points) > 0:
+                new_centers[j] = cluster_points.mean(axis=0)
+            else:
+                new_centers[j] = self.cluster_centers_[j]  # 空簇保留旧中心
+        self.cluster_centers_ = new_centers
+
         self.data = self.data.assign(cluster_id=self.labels_)
         self.cluster_center = self.getClusterCenter()
         # left join 保证标签缺失/异常时不静默丢门店行（与 district_extension_cluster 保持一致）

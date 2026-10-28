@@ -41,9 +41,6 @@ from app.models.dto.RoutingDTO import (
     RoutingSolveRequest,
     RouteResult,
     RoutingSolveResponse,
-    GlobalRoutingSolveRequest,
-    DailyRoutingResult,
-    GlobalRoutingSolveResponse,
     SaveRoutingPlanRequest,
 )
 from app.models.dto.DepotDTO import (
@@ -81,7 +78,7 @@ __all__ = [
     "ScheduleSolveRequest", "ScheduleSolveResponse", "SaveClusterPlanRequest", "SaveScheduleRequest",
     # Routing
     "RoutePoint", "TruckProfile", "RoutingSolveRequest", "RouteResult", "RoutingSolveResponse",
-    "GlobalRoutingSolveRequest", "DailyRoutingResult", "GlobalRoutingSolveResponse", "SaveRoutingPlanRequest",
+    "SaveRoutingPlanRequest",
     # Depot
     "DepotBase", "DepotCreate", "DepotUpdate", "DepotResponse",
     # Location

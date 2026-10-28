@@ -90,6 +90,8 @@ class ScheduleSolveRequest(BaseModel):
 
 class ScheduleSolveResponse(BaseModel):
     points: List[dict]
+    daily_stats: Optional[Dict[str, dict]] = Field(default_factory=dict, description="每个排班日的门店数/装载量统计")
+    total_stores: Optional[int] = Field(0, description="参与排班的门店总数")
 
 
 class SaveClusterPlanRequest(BaseModel):
@@ -110,3 +112,5 @@ class SaveScheduleRequest(BaseModel):
     depot_lng: Optional[float] = 108.318344
     depot_lat: Optional[float] = 22.846367
     points: List[dict]
+    work_days: Optional[int] = Field(6, description="排班工作日数")
+    daily_stats: Optional[Dict[str, dict]] = Field(default_factory=dict, description="每个排班日的门店数/装载量统计")

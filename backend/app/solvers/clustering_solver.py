@@ -38,20 +38,16 @@ def solve_clustering(req: ClusteringSolveRequest, provider: DistanceProvider) ->
         df["avg_loads"] = df["avg_loads"].fillna(1.0).astype(float)
 
     if "district" not in df.columns:
-        df["district"] = "未知区划"
+        df["district"] = ""
     else:
-        df["district"] = df["district"].fillna("").astype(str).str.strip()
-        # Fallback: if district is empty, attempt to infer from address or name
-        for idx, row in df.iterrows():
-            if not row["district"] or row["district"] in ["", "nan", "None", "null"]:
-                addr = str(row.get("address", "") or "")
-                name = str(row.get("name", "") or "")
-                extracted = ""
-                for target_d in ["青秀区", "兴宁区", "江南区", "西乡塘区", "良庆区", "邕宁区", "武鸣区", "横州市", "宾阳县", "上林县", "马山县", "隆安县"]:
-                    if target_d in addr or target_d in name or target_d.replace("区", "") in addr:
-                        extracted = target_d
-                        break
-                df.at[idx, "district"] = extracted if extracted else "未知区划"
+        # 仅清洗，不做区县推断：缺失就保持为空，由所选聚类算法自行处理
+        df["district"] = (
+            df["district"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .replace({"nan": "", "None": "", "null": ""})
+        )
 
     # Use the depot coordinates supplied in request or fallback to center of points
     depot_lng = req.depot_lng
