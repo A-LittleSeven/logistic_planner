@@ -5,7 +5,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from math import radians, cos, sin, asin, sqrt
-from typing import Protocol
+from typing import Optional, Protocol, Sequence, Tuple
+import numpy as np
 
 
 class DistanceProvider(Protocol):
@@ -13,26 +14,41 @@ class DistanceProvider(Protocol):
     def distance(self, lon1: float, lat1: float, lon2: float, lat2: float) -> float:
         ...
 
-    def matrix_km(self, pts: list) -> list:
-        """返回 n×n 距离矩阵 (km)，pts 为 (lng, lat) 元组列表。"""
+    def matrix_km(self, pts: Sequence[Tuple[float, float]], as_list: bool = True) -> "list[list[float]] | np.ndarray":
+        """返回 n×n 距离矩阵 (km)，pts 为 (lng, lat) 元组列表。as_list=False 时返回 numpy 数组以避免大矩阵的 Python 对象内存开销。"""
         ...
 
 
 class HaversineProvider:
-    """使用 Haversine 公式计算直线距离。"""
+    """使用 Haversine 公式计算球面大圆距离与距离矩阵。"""
     def distance(self, lon1: float, lat1: float, lon2: float, lat2: float) -> float:
         return haversine(lon1, lat1, lon2, lat2)
 
-    def matrix_km(self, pts: list) -> list:
+    def matrix_km(self, pts: Sequence[Tuple[float, float]], as_list: bool = True) -> "list[list[float]] | np.ndarray":
         """构建 n×n haversine 距离矩阵 (km)，pts 为 (lng, lat) 元组列表。"""
         n = len(pts)
-        matrix = [[0.0] * n for _ in range(n)]
-        for i in range(n):
-            for j in range(i + 1, n):
-                d = haversine(pts[i][0], pts[i][1], pts[j][0], pts[j][1])
-                matrix[i][j] = d
-                matrix[j][i] = d
-        return matrix
+        if n == 0:
+            return [] if as_list else np.zeros((0, 0), dtype=float)
+        if n == 1:
+            return [[0.0]] if as_list else np.zeros((1, 1), dtype=float)
+
+        coords = np.radians(np.asarray(pts, dtype=float))
+        lons = coords[:, 0]
+        lats = coords[:, 1]
+
+        dlon = lons[:, None] - lons[None, :]
+        dlat = lats[:, None] - lats[None, :]
+
+        a = np.sin(dlat / 2.0) ** 2 + np.cos(lats[:, None]) * np.cos(lats[None, :]) * (np.sin(dlon / 2.0) ** 2)
+        np.clip(a, 0.0, 1.0, out=a)
+        dist_mat = 2.0 * 6371.0 * np.arcsin(np.sqrt(a))
+        np.fill_diagonal(dist_mat, 0.0)
+        return dist_mat.tolist() if as_list else dist_mat
+
+
+def ensure_provider(provider: Optional[DistanceProvider] = None) -> DistanceProvider:
+    """确保返回有效的 DistanceProvider 实例（未传入时默认使用 HaversineProvider）。"""
+    return provider if provider is not None else HaversineProvider()
 
 
 def get_provider(name: str, amap_key: str = "") -> DistanceProvider:

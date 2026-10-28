@@ -3,10 +3,10 @@
 解决不同层次之间（DTO <-> ORM <-> Domain Node <-> Solver Dict/Matrix）的数据格式转换，
 统一坐标字段映射 (lng/longitude/store_lon, lat/latitude/store_lat) 与默认值填充。
 """
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+import pandas as pd
 from app.models.do.StoreDO import StoreNode
-from app.models.dto.StoreDTO import StoreBase
-from app.utils.distance import haversine
+from app.utils.distance import DistanceProvider, ensure_provider
 
 
 def normalize_coordinates(data: Union[Dict[str, Any], Any]) -> Tuple[float, float]:
@@ -35,18 +35,27 @@ def parse_available_trucks(val: Any) -> List[str]:
     return []
 
 
+def _clean_district(val: Any) -> str:
+    """清洗行政区划字符串，过滤 nan/None/null 等无效文本。"""
+    if val is None:
+        return ""
+    s = str(val).strip()
+    return "" if s in ("nan", "None", "null", "NaN") else s
+
+
 def to_store_node(
     data: Union[Dict[str, Any], Any],
     default_idx: int = 0,
     depot_lng: Optional[float] = None,
-    depot_lat: Optional[float] = None
+    depot_lat: Optional[float] = None,
+    provider: Optional[DistanceProvider] = None,
 ) -> StoreNode:
-    """将字典、Pydantic DTO 或 ORM 对象安全转换为启发式算法所需的 StoreNode 领域对象。"""
+    """将字典、Pydantic DTO 或 ORM 对象安全转换为统一算法领域对象 StoreNode。"""
     if isinstance(data, StoreNode):
         return data
 
     if isinstance(data, dict):
-        d = data
+        d = dict(data)
     elif hasattr(data, "model_dump"):
         d = data.model_dump()
         if hasattr(data, "model_extra") and data.model_extra:
@@ -57,6 +66,7 @@ def to_store_node(
         d = dict(data)
 
     lng, lat = normalize_coordinates(d)
+    prov = ensure_provider(provider)
 
     # 中心仓坐标与距离计算
     center_lng = d.get("center_lng") or d.get("cluster_center_lon") or lng
@@ -65,16 +75,17 @@ def to_store_node(
     c_dist = d.get("cdist_warehouse") or d.get("c_dist") or 0.0
 
     if (s_dist <= 0.0001) and (depot_lng is not None and depot_lat is not None):
-        s_dist = haversine(float(lng), float(lat), float(depot_lng), float(depot_lat))
+        s_dist = prov.distance(float(lng), float(lat), float(depot_lng), float(depot_lat))
     if (c_dist <= 0.0001) and (depot_lng is not None and depot_lat is not None):
-        c_dist = haversine(float(center_lng), float(center_lat), float(depot_lng), float(depot_lat))
+        c_dist = prov.distance(float(center_lng), float(center_lat), float(depot_lng), float(depot_lat))
 
     truck_list = parse_available_trucks(d.get("available_truck"))
     dept_id = str(d.get("dept_id") or d.get("shop_code") or default_idx)
     shop_code = str(d.get("shop_code") or d.get("dept_id") or default_idx)
     name = str(d.get("name") or d.get("shop_name") or f"store_{default_idx}")
-    freq = int(float(d.get("frequency") or 1))
-    avg_loads = float(d.get("avg_loads") or d.get("demand") or 10.0)
+    freq = int(float(d.get("frequency") if d.get("frequency") not in (None, "") else 1))
+    raw_loads = d.get("avg_loads") if d.get("avg_loads") not in (None, "") else d.get("demand")
+    avg_loads = float(raw_loads if raw_loads not in (None, "") else 10.0)
 
     try:
         raw_hp = d.get("is_homepot")
@@ -82,17 +93,25 @@ def to_store_node(
     except (ValueError, TypeError):
         is_homepot = 0
 
+    raw_cid = d.get("cluster_center_id") if d.get("cluster_center_id") is not None else d.get("cluster_id")
+    try:
+        cluster_center_id = int(raw_cid) if raw_cid not in (None, "") else 0
+    except (ValueError, TypeError):
+        cluster_center_id = 0
+
     return StoreNode(
         point_idx=default_idx,
         shop_code=shop_code,
         name=name,
         dept_id=dept_id,
-        district=str(d.get("district") or ""),
-        district_sub=str(d.get("district_sub") or ""),
-        city_name=str(d.get("city_name") or ""),
+        district=_clean_district(d.get("district")),
+        district_sub=_clean_district(d.get("district_sub")),
+        city_name=_clean_district(d.get("city_name")),
         warzone=str(d.get("warzone") or "0"),
         store_lon=float(lng),
         store_lat=float(lat),
+        warehouse_lon=float(depot_lng) if depot_lng is not None else d.get("warehouse_lon"),
+        warehouse_lat=float(depot_lat) if depot_lat is not None else d.get("warehouse_lat"),
         cluster_center_lon=float(center_lng),
         cluster_center_lat=float(center_lat),
         sdist_warehouse=float(s_dist),
@@ -105,5 +124,99 @@ def to_store_node(
         address=str(d.get("address") or ""),
         avg_loads=avg_loads,
         demand=avg_loads,
-        cluster_center_id=int(d.get("cluster_center_id") or d.get("cluster_id") or 0),
+        cluster_center_id=cluster_center_id,
     )
+
+
+def to_store_nodes(
+    points: Sequence[Any],
+    depot_lng: Optional[float] = None,
+    depot_lat: Optional[float] = None,
+    provider: Optional[DistanceProvider] = None,
+) -> List[StoreNode]:
+    """批量将输入点位列表转换为统一的 StoreNode 领域对象列表，并通过 DistanceProvider.matrix_km 批量计算距仓距离。"""
+    if not points:
+        return []
+    prov = ensure_provider(provider)
+    nodes = [
+        to_store_node(p, default_idx=idx, depot_lng=None, depot_lat=None, provider=prov)
+        for idx, p in enumerate(points)
+    ]
+    if depot_lng is not None and depot_lat is not None:
+        d_lng, d_lat = float(depot_lng), float(depot_lat)
+        # 逐点计算距仓距离即可满足需求：仅需要 1×n 向量，不必构建 (n+1)² 全量矩阵
+        s_dists = [
+            prov.distance(d_lng, d_lat, float(n.store_lon), float(n.store_lat)) for n in nodes
+        ]
+        c_dists = [
+            prov.distance(d_lng, d_lat, float(n.cluster_center_lon or n.store_lon), float(n.cluster_center_lat or n.store_lat))
+            for n in nodes
+        ]
+
+        for idx, node in enumerate(nodes):
+            node.warehouse_lon = d_lng
+            node.warehouse_lat = d_lat
+            if not node.sdist_warehouse or node.sdist_warehouse <= 0.0001:
+                node.sdist_warehouse = float(s_dists[idx])
+            if not node.cdist_warehouse or node.cdist_warehouse <= 0.0001:
+                node.cdist_warehouse = float(c_dists[idx])
+    return nodes
+
+
+def store_nodes_to_dataframe(stores: Sequence[StoreNode]) -> pd.DataFrame:
+    """将统一的 StoreNode 领域对象列表转换为供向量化聚类算法使用的 DataFrame。"""
+    rows = []
+    for idx, s in enumerate(stores):
+        rows.append({
+            "_orig_idx": s.point_idx if s.point_idx is not None else idx,
+            "lng": float(s.store_lon),
+            "lat": float(s.store_lat),
+            "longitude": float(s.store_lon),
+            "latitude": float(s.store_lat),
+            "frequency": int(s.frequency or 1),
+            "avg_loads": float(s.avg_loads or 1.0),
+            "district": _clean_district(s.district),
+            "is_homepot": int(s.is_homepot if s.is_homepot is not None else 0),
+            "shop_code": s.shop_code,
+            "dept_id": s.dept_id,
+            "name": s.name,
+        })
+    return pd.DataFrame(rows)
+
+
+def store_node_to_point_dict(
+    store: StoreNode,
+    base_point: Optional[Any] = None,
+    extra_updates: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """将领域对象 StoreNode 还原为对外响应所需的点位字典（保留原始扩展属性）。"""
+    if base_point is not None:
+        if isinstance(base_point, dict):
+            out = dict(base_point)
+        elif hasattr(base_point, "model_dump"):
+            out = base_point.model_dump()
+            if hasattr(base_point, "model_extra") and base_point.model_extra:
+                out.update(base_point.model_extra)
+        else:
+            out = {}
+    else:
+        out = {}
+
+    out.update({
+        "lng": float(store.store_lon),
+        "lat": float(store.store_lat),
+        "name": store.name,
+        "shop_code": store.shop_code,
+        "dept_id": store.dept_id,
+        "district": store.district,
+        "frequency": store.frequency,
+        "avg_loads": store.avg_loads,
+        "is_homepot": store.is_homepot if store.is_homepot is not None else 0,
+        "sdist_warehouse": float(store.sdist_warehouse or 0.0),
+        "cdist_warehouse": float(store.cdist_warehouse or 0.0),
+    })
+    if store.cluster_center_id is not None:
+        out["cluster_id"] = int(store.cluster_center_id)
+    if extra_updates:
+        out.update(extra_updates)
+    return out

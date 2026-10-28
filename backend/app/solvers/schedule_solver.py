@@ -2,88 +2,104 @@
 
 支持通过 schedule_registry 灵活拓展多种排班方法 (例如: 店群负载均衡排班、频次平滑排班等)。
 """
-from typing import Dict, Any, List
+from typing import Dict, Any, Optional
 from app.models.dto.ClusteringDTO import ScheduleSolveRequest
 from app.models.do.ClusterDO import ClusterNode
 from app.models.do.StoreDO import StoreNode
+from app.models.do.VehicleDO import TruckIdAllocator, VehicleNode, load_fleet_classes
 from app.core.optimizer.truck_schedule import TruckSchedule
 from app.core.optimizer.route_optimizer import RouteOptimizer
 from app.core.optimizer.schedule_balancer import working_schedule, balance_schedule
-from app.utils.distance import haversine
+from app.utils.distance import DistanceProvider, ensure_provider
 from app.utils.registry import schedule_registry
+from app.models.ModelConverter import to_store_nodes, store_node_to_point_dict
 
 
-from app.models.ModelConverter import to_store_node
-
-
-def solve_cluster_balanced_schedule(req: ScheduleSolveRequest) -> Dict[str, Any]:
+def solve_cluster_balanced_schedule(
+    req: ScheduleSolveRequest,
+    provider: Optional[DistanceProvider] = None,
+) -> Dict[str, Any]:
     """基于店群拓扑与车型容量约束的排班均衡算法 (默认推荐算法)"""
+    prov = ensure_provider(provider)
     depot_lng = float(req.depot_lng)
     depot_lat = float(req.depot_lat)
 
-    # 1 & 2. 构造 StoreNode 数据列表
-    stores_list = []
-    high_freq_stores = []
-    total_store = []
-    for idx, p in enumerate(req.points):
-        store = to_store_node(p, default_idx=idx, depot_lng=depot_lng, depot_lat=depot_lat)
-        total_store.append(store)
-        if store.frequency > 2:
-            high_freq_stores.append(store)
-        else:
-            stores_list.append(store)
-
-    # 3. 构造 ClusterNode 数据列表
-    cluster_ids = sorted(list(set(store.cluster_center_id for store in total_store if store.cluster_center_id is not None)))
-    cluster_list = []
-    for cid in cluster_ids:
-        tmp_list = [store for store in stores_list if store.cluster_center_id == cid]
-        if not tmp_list:
-            continue
-        cluster = ClusterNode(
-            cluster_id=cid,
-            cluster_lon=tmp_list[0].cluster_center_lon,
-            cluster_lat=tmp_list[0].cluster_center_lat,
-            cdist_warehouse=tmp_list[0].cdist_warehouse,
-            cluster_store_detailed=tmp_list,
-        )
-        cluster_list.append(cluster)
-
-    # 4. 执行排班策略与运力调度
-    options = req.options or {}
-    max_rate = float(options.get("max_truck_capacity_rate", 0.96))
-    n_neighbor = int(options.get("search_n_neighbor", 1))
-    simple_thres = int(options.get("simple_mode_thres", 0))
-    detour_thres = float(options.get("detour_thres", 500.0))
-    dist_thres = float(options.get("dist_thres", 0.9))
-    one_way_dist_max = int(options.get("one_way_dist_max", 40))
-    work_days = int(options.get("work_days", 6))
-    fleet_classes = options.get("_fleet_classes") or options.get("truck_classes")
-
-    # 上下文隔离的 ID 重置（并发安全）
-    from app.models.do.VehicleDO import TruckIdAllocator
-    TruckIdAllocator.reset(1)
-
-    sorted_cluster = sorted(cluster_list, key=lambda x: x.cdist_warehouse)
-    scheduler = TruckSchedule(
-        max_truck_capacity_rate=max_rate,
-        search_n_neighbor=n_neighbor,
-        simple_mode_thres=simple_thres,
-        dist_thres=dist_thres,
-        one_way_dist_max=one_way_dist_max,
-        detour_thres=detour_thres,
-        truck_classes=fleet_classes,
+    # 1. 统一构造 StoreNode 领域对象列表，并通过 DistanceProvider.matrix_km 批量计算距仓距离
+    total_store = to_store_nodes(
+        req.points,
+        depot_lng=depot_lng,
+        depot_lat=depot_lat,
+        provider=prov,
     )
+    stores_list = [s for s in total_store if (s.frequency or 1) <= 2]
+    high_freq_stores = [s for s in total_store if (s.frequency or 1) > 2]
 
-    if sorted_cluster:
-        scheduler.schedule(sorted_cluster)
-        RouteOptimizer.local_route_optimize(scheduler.plan_trucks)
+    # 2. 通过 DistanceProvider.matrix_km 预计算全量门店间距离矩阵并绑定至当前执行上下文
+    store_coords = [(float(s.store_lon), float(s.store_lat)) for s in total_store]
+    # ndarray 形态：避免 4000+ 门店时 tolist 产生 GB 级 Python 对象开销
+    store_dist_matrix = prov.matrix_km(store_coords, as_list=False)
+    StoreNode.bind_distance_context(matrix=store_dist_matrix, provider=prov)
 
-        # 5. 分配至各作业日并进行多日平滑均衡
-        schedule, loads = working_schedule(scheduler.plan_trucks, work_days=work_days)
-        schedule, loads = balance_schedule(schedule, loads, scheduler.plan_trucks, work_days=work_days)
-    else:
-        schedule = {d: [] for d in range(work_days)}
+    try:
+        # 3. 构造 ClusterNode 数据列表
+        cluster_ids = sorted(
+            list(set(store.cluster_center_id for store in total_store if store.cluster_center_id is not None))
+        )
+        cluster_list = []
+        for cid in cluster_ids:
+            tmp_list = [store for store in stores_list if store.cluster_center_id == cid]
+            if not tmp_list:
+                continue
+            cluster = ClusterNode(
+                cluster_id=cid,
+                cluster_lon=tmp_list[0].cluster_center_lon,
+                cluster_lat=tmp_list[0].cluster_center_lat,
+                cdist_warehouse=tmp_list[0].cdist_warehouse,
+                cluster_store_detailed=tmp_list,
+            )
+            cluster_list.append(cluster)
+
+        # 4. 执行排班策略与运力调度
+        options = req.options or {}
+        max_rate = float(options.get("max_truck_capacity_rate", 0.96))
+        n_neighbor = int(options.get("search_n_neighbor", 1))
+        simple_thres = int(options.get("simple_mode_thres", 0))
+        detour_thres = float(options.get("detour_thres", 500.0))
+        dist_thres = float(options.get("dist_thres", 0.9))
+        one_way_dist_max = int(options.get("one_way_dist_max", 40))
+        work_days = int(options.get("work_days", 6))
+
+        fleet_classes = options.get("_fleet_classes") or options.get("truck_classes")
+        if not fleet_classes and options.get("_vehicles_data"):
+            fleet_classes = load_fleet_classes(options.get("_vehicles_data"))
+        if fleet_classes:
+            VehicleNode.set_supported_truck_classes(fleet_classes)
+
+        # 上下文隔离的 ID 重置（并发安全）
+        TruckIdAllocator.reset(1)
+
+        sorted_cluster = sorted(cluster_list, key=lambda x: x.cdist_warehouse)
+        scheduler = TruckSchedule(
+            max_truck_capacity_rate=max_rate,
+            search_n_neighbor=n_neighbor,
+            simple_mode_thres=simple_thres,
+            dist_thres=dist_thres,
+            one_way_dist_max=one_way_dist_max,
+            detour_thres=detour_thres,
+            truck_classes=fleet_classes,
+        )
+
+        if sorted_cluster:
+            scheduler.schedule(sorted_cluster)
+            RouteOptimizer.local_route_optimize(scheduler.plan_trucks)
+
+            # 5. 分配至各作业日并进行多日平滑均衡
+            schedule, loads = working_schedule(scheduler.plan_trucks, work_days=work_days)
+            schedule, loads = balance_schedule(schedule, loads, scheduler.plan_trucks, work_days=work_days)
+        else:
+            schedule = {d: [] for d in range(work_days)}
+    finally:
+        StoreNode.clear_distance_context()
 
     # 6. 提取每个门店被分配的排班日 (0..work_days-1)
     store_scheduled_days = {}
@@ -143,16 +159,16 @@ def solve_cluster_balanced_schedule(req: ScheduleSolveRequest) -> Dict[str, Any]
                     continue
             store_scheduled_days[s_idx] = set(best_days)
 
-    # 8. 映射为规范中文作业日字符串
+    # 8. 映射为规范中文作业日字符串并序列化 StoreNode
     day_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
     enriched_points = []
-    for idx, p in enumerate(req.points):
+    for idx, store in enumerate(total_store):
         scheduled_indices = sorted(list(store_scheduled_days.get(idx, [])))
         days_str = ",".join(day_names[d] for d in scheduled_indices if d < len(day_names))
-        
+
         # 兜底保障
         if not days_str:
-            freq = int(p.model_extra.get("frequency") if hasattr(p, 'model_extra') and p.model_extra else (getattr(p, 'frequency', 1) or 1))
+            freq = int(store.frequency or 1)
             if freq >= 6:
                 days_str = "周一,周二,周三,周四,周五,周六"
             elif freq >= 3:
@@ -162,10 +178,15 @@ def solve_cluster_balanced_schedule(req: ScheduleSolveRequest) -> Dict[str, Any]
             else:
                 days_str = "周一"
 
-        pt_dict = p.model_dump()
-        pt_dict["delivery_days_str"] = days_str
-        pt_dict["schedule_day"] = days_str
-        pt_dict["delivery_day"] = days_str.split(',')[0].strip()
+        pt_dict = store_node_to_point_dict(
+            store,
+            base_point=req.points[idx],
+            extra_updates={
+                "delivery_days_str": days_str,
+                "schedule_day": days_str,
+                "delivery_day": days_str.split(",")[0].strip(),
+            },
+        )
         enriched_points.append(pt_dict)
 
     # 统计每日门店数与日均总装载

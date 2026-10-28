@@ -3,9 +3,18 @@
 专职用于启发式排班、聚类与装载运筹算法的运行时实体。
 维护动态频次衰减、空间距离计算与候选店检索等领域行为。
 """
-from typing import Optional, List
+import contextvars
+from typing import Any, Optional, List
 from pydantic import BaseModel, Field, ConfigDict
-from app.utils.distance import haversine
+from app.utils.distance import DistanceProvider, ensure_provider, haversine
+
+# 上下文隔离的距离矩阵与 DistanceProvider 绑定，供排班/局部优化阶段 O(1) 查表
+_dist_matrix_ctx: contextvars.ContextVar[Optional[Any]] = contextvars.ContextVar(
+    "store_dist_matrix", default=None
+)
+_dist_provider_ctx: contextvars.ContextVar[Optional[DistanceProvider]] = contextvars.ContextVar(
+    "store_dist_provider", default=None
+)
 
 
 class StoreNode(BaseModel):
@@ -65,16 +74,54 @@ class StoreNode(BaseModel):
     def load(self) -> float:
         return float(self.avg_loads or self.demand or 0.0)
 
+    @classmethod
+    def bind_distance_context(
+        cls,
+        matrix: Optional[Any] = None,  # list[list[float]] 或 np.ndarray
+        provider: Optional[DistanceProvider] = None,
+    ):
+        """在当前执行上下文中绑定由 DistanceProvider.matrix_km 预计算的距离矩阵与提供者。"""
+        _dist_matrix_ctx.set(matrix)
+        _dist_provider_ctx.set(provider)
+
+    @classmethod
+    def clear_distance_context(cls):
+        """清理当前上下文的距离矩阵与提供者绑定。"""
+        _dist_matrix_ctx.set(None)
+        _dist_provider_ctx.set(None)
+
+    @classmethod
+    def get_active_provider(cls) -> DistanceProvider:
+        """获取当前上下文绑定的 DistanceProvider，未绑定时返回默认 HaversineProvider。"""
+        return ensure_provider(_dist_provider_ctx.get())
+
     def update_freq_remains(self):
         """更新剩余频次"""
         if self.store_freq_remains is not None:
             self.store_freq_remains -= 1
 
-    def calc_haversine_distance(self, other_store: "StoreNode") -> float:
-        """计算两个门店之间的地理距离 (km)"""
+    def calc_haversine_distance(
+        self,
+        other_store: "StoreNode",
+        provider: Optional[DistanceProvider] = None,
+    ) -> float:
+        """计算两个门店之间的距离 (km)。优先使用上下文预计算的距离矩阵 O(1) 查表，其次调用 DistanceProvider。"""
         if self.store_lon is None or self.store_lat is None or other_store.store_lon is None or other_store.store_lat is None:
             return 0.0
-        return haversine(self.store_lon, self.store_lat, other_store.store_lon, other_store.store_lat)
+
+        if provider is None:
+            mat = _dist_matrix_ctx.get()
+            i = self.point_idx
+            j = other_store.point_idx
+            if mat is not None and i is not None and j is not None:
+                if 0 <= i < len(mat) and 0 <= j < len(mat[i]):
+                    return float(mat[i][j])
+            active_prov = _dist_provider_ctx.get()
+            if active_prov is not None:
+                return float(active_prov.distance(self.store_lon, self.store_lat, other_store.store_lon, other_store.store_lat))
+            return haversine(self.store_lon, self.store_lat, other_store.store_lon, other_store.store_lat)
+
+        return float(provider.distance(self.store_lon, self.store_lat, other_store.store_lon, other_store.store_lat))
 
     def find_nearest_store(self, store_list: List["StoreNode"]) -> "StoreNode":
         """寻找最近的门店"""
