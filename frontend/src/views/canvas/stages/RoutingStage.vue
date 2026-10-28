@@ -273,7 +273,7 @@ const handleRunRouting = async () => {
               avg_loads: boxes,
               demand: boxes,
               weight: boxes,
-              is_homepot: s.is_homepot !== undefined && s.is_homepot !== null ? Number(s.is_homepot) : 1,
+              is_homepot: s.is_homepot !== undefined && s.is_homepot !== null && s.is_homepot !== '' ? Number(s.is_homepot) : 0,
             }
           }),
         ]
@@ -359,7 +359,7 @@ const handleRunRouting = async () => {
             avg_loads: boxes,
             demand: boxes,
             weight: boxes,
-            is_homepot: s.is_homepot !== undefined && s.is_homepot !== null ? Number(s.is_homepot) : 1,
+            is_homepot: s.is_homepot !== undefined && s.is_homepot !== null && s.is_homepot !== '' ? Number(s.is_homepot) : 0,
           }
         }),
       ]

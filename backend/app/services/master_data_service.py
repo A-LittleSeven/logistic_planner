@@ -58,7 +58,7 @@ class StoreService:
                         latitude=float(r.get("latitude") or r.get("lat") or 0.0),
                         avg_loads=float(r.get("avg_loads") or 0.0),
                         frequency=int(float(r.get("frequency") or 1)),
-                        is_homepot=int(r.get("is_homepot") or 1),
+                        is_homepot=int(r.get("is_homepot")) if r.get("is_homepot") not in (None, "") else 0,
                         service_time=float(r.get("dist_time") or 40) / 60.0
                         if r.get("dist_time")
                         else 0.65,

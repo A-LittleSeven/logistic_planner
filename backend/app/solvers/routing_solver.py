@@ -115,7 +115,7 @@ def solve_or_tools_vrp(req: RoutingSolveRequest, provider: DistanceProvider) -> 
             "order": order_indices,
             "distance": float(route.get("distance_km", 0.0)),
             "load": float(route.get("load", 0.0)),
-            "is_homepot": int(route.get("is_homepot") if route.get("is_homepot") is not None else 1),
+            "is_homepot": int(route.get("is_homepot") if route.get("is_homepot") is not None else 0),
             "return_to_depot": bool(return_to_depot),
             "fill_rate": float(route.get("fill_rate", 0.0)),
             "cost_per_km": float(route.get("cost_per_km", cost_per_km)),

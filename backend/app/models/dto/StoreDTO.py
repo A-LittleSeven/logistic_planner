@@ -19,7 +19,7 @@ class StoreBase(BaseModel):
     avg_loads: Optional[float] = Field(0.0, description="日均箱数/需求量")
     frequency: Optional[int] = Field(1, description="配送频次")
     store_freq_remains: Optional[int] = Field(None, description="剩余频次")
-    is_homepot: Optional[int] = Field(1, description="是否本埠(1=本埠, 0=外埠)")
+    is_homepot: Optional[int] = Field(0, description="是否本埠(1=本埠, 0=外埠)")
     store_is_need_dist: Optional[bool] = Field(True, description="是否需要配送")
     service_time: Optional[float] = Field(0.5, description="卸货服务时间(小时)")
     available_truck: Optional[Union[str, List[str]]] = Field(None, description="可配送车型")

@@ -38,8 +38,8 @@ def _normalize_store(store: Union[StoreNode, dict[str, Any]], index: int) -> dic
     if demand < 0:
         raise ValueError(f"门店 {label} 的需求货量不能小于 0")
 
-    # 本埠/外埠标识：is_homepot 为 1 表示本埠，0 表示外埠；缺失时默认按本埠(1)处理
-    is_homepot = int(is_homepot) if is_homepot is not None else 1
+    # 本埠/外埠标识：is_homepot 为 1 表示本埠，0 表示外埠；缺失时默认按外埠(0)处理
+    is_homepot = int(is_homepot) if is_homepot not in (None, "") else 0
 
     return {
         "label": str(label),

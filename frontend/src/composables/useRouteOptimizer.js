@@ -305,7 +305,7 @@ export function useRouteOptimizer() {
    */
   const resolveHomepot = (route, fallbackStores = []) => {
     if (route.is_homepot !== undefined && route.is_homepot !== null) return Number(route.is_homepot)
-    return fallbackStores.length > 0 ? Number(fallbackStores[0].is_homepot ?? 1) : 1
+    return fallbackStores.length > 0 ? Number(fallbackStores[0].is_homepot ?? 0) : 0
   }
 
   /**

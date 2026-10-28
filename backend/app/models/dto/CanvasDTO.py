@@ -18,7 +18,7 @@ class CanvasPoint(BaseModel):
     lat: float
     avg_loads: Optional[float] = 10.0
     frequency: Optional[int] = 1
-    is_homepot: Optional[int] = 1
+    is_homepot: Optional[int] = 0
     district: Optional[str] = None
     address: Optional[str] = None
     cluster_id: Optional[int] = None
