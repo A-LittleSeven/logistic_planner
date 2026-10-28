@@ -29,23 +29,9 @@ def solve_or_tools_vrp(req: RoutingSolveRequest, provider: DistanceProvider) -> 
         }
 
     # Count of trucks and capacity
-    count_270 = 0
-    count_230 = 0
-    for t_prof in req.trucks:
-        if t_prof.capacity <= 100:
-            count_270 += t_prof.count
-        else:
-            count_230 += t_prof.count
-
-    if count_230 == 0 and count_270 == 0:
-        count_230 = len(customers)
-
     # Convert customers to stores dict list for route_replanner
     stores_data = []
     for idx, p in enumerate(customers):
-        p_name = (p.name or "").strip()
-        p_code = (getattr(p, "shop_code", "") or (p.model_extra.get("shop_code") if hasattr(p, "model_extra") and p.model_extra else "") or "").strip()
-
         # Extract is_homepot safely from RoutePoint or model_extra (未提供时默认外埠 0)
         is_hp = getattr(p, "is_homepot", None)
         if (is_hp is None or is_hp == "") and hasattr(p, "model_extra") and p.model_extra:
@@ -110,17 +96,11 @@ def solve_or_tools_vrp(req: RoutingSolveRequest, provider: DistanceProvider) -> 
     routes_list = []
     total_dist = 0.0
     for r_idx, route in enumerate(daily_routes):
-        store_labels = route.get("path_store_ids", [])
+        # label 恒为 "cust_{idx}"（构造 stores_data 时生成），直接解析索引
         order_indices = []
-        for label in store_labels:
-            if str(label).startswith("cust_"):
-                c_idx = int(str(label).split("_")[1])
-                order_indices.append(c_idx)
-            else:
-                for c_idx, p in enumerate(customers):
-                    if (p.name or f"store_{c_idx}") == label:
-                        order_indices.append(c_idx)
-                        break
+        for label in route.get("path_store_ids", []):
+            c_idx = int(str(label).split("_")[1])
+            order_indices.append(c_idx)
 
         # Wrap route with depot indicator (-1)
         if return_to_depot:
@@ -160,4 +140,3 @@ def solve_or_tools_vrp(req: RoutingSolveRequest, provider: DistanceProvider) -> 
 
 
 routing_registry.register("ortools", solve_or_tools_vrp)
-routing_registry.register("savings_vrp", solve_or_tools_vrp)
