@@ -47,7 +47,7 @@ export function escapeHtml(str) {
 export function dotHtml({ text = '', color = '#3b82f6', size = 22, textColor = '#fff' }) {
   const half = size / 2
   const str = String(text)
-  
+
   // 自适应字号与字间距智能计算 (保持圆圈原始 size 不变)
   let fontSize = Math.round(size * 0.5) // 默认 11px
   let letterSpacing = 'normal'
@@ -73,7 +73,7 @@ export function dotHtml({ text = '', color = '#3b82f6', size = 22, textColor = '
       `background:${color};border:2px solid #ffffff;box-shadow:0 2px 6px rgba(0,0,0,0.28);` +
       `display:flex;align-items:center;justify-content:center;color:${textColor};` +
       `font-size:${fontSize}px;font-weight:700;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC',system-ui,sans-serif;` +
-      `letter-spacing:${letterSpacing};${transform}white-space:nowrap;overflow:hidden;box-sizing:border-box;line-height:1;text-align:center;">${str}</div>`,
+      `letter-spacing:${letterSpacing};${transform}white-space:nowrap;overflow:hidden;box-sizing:border-box;line-height:1;text-align:center;">${escapeHtml(str)}</div>`,
     offset: [-half, -half],
   }
 }

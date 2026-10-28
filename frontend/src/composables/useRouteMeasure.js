@@ -164,11 +164,14 @@ export function useRouteMeasure() {
         }
       }
 
+      const formattedDuration = formatDuration(totalDurationSec)
       measureSummary.value = {
         successCount,
+        count: `${successCount}/${total}`,
         total,
         totalDist: Number(totalDist.toFixed(1)),
-        totalDurationFormatted: formatDuration(totalDurationSec),
+        totalDuration: formattedDuration,
+        totalDurationFormatted: formattedDuration,
         totalTolls,
       }
 

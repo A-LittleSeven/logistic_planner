@@ -55,6 +55,21 @@ export function provideCanvasState(canvasId) {
   const minZoneSize = ref(5)
   const maxZoneSize = ref(30)
 
+  const loadPersistedOptions = (storageKey, defaults) => {
+    try {
+      const raw = localStorage.getItem(storageKey)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object') {
+          return { ...defaults, ...parsed }
+        }
+      }
+    } catch (e) {
+      console.warn(`[useCanvasState] 读取缓存配置 ${storageKey} 失败:`, e)
+    }
+    return { ...defaults }
+  }
+
   const defaultScheduleOptions = {
     max_truck_capacity_rate: 0.96,
     search_n_neighbor: 1,
@@ -63,14 +78,14 @@ export function provideCanvasState(canvasId) {
     one_way_dist_max: 40,
     work_days: 6,
   }
-  const scheduleOptions = ref({ ...defaultScheduleOptions })
+  const scheduleOptions = ref(loadPersistedOptions('canvas_schedule_options', defaultScheduleOptions))
 
   const defaultRouteOptions = {
     max_capacity_rate: 1.10,
     time_limit_seconds: 60,
     return_to_depot: false,
   }
-  const routeOptions = ref({ ...defaultRouteOptions })
+  const routeOptions = ref(loadPersistedOptions('canvas_route_options', defaultRouteOptions))
 
   // 4. Map & Box Selection Tool
   const mapPanelRef = shallowRef(null)
@@ -391,7 +406,7 @@ export function provideCanvasState(canvasId) {
         total_weight: Number(movedStore.avg_loads || movedStore.demand || 10),
         distance: 0,
         distance_km: 0,
-        is_homepot: Number(movedStore.is_homepot ?? 1),
+        is_homepot: Number(movedStore.is_homepot ?? 0),
         return_to_depot: isReturn,
       }
       targetDayRoutes.push(newRoute)

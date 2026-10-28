@@ -57,10 +57,11 @@ export function useRouteMapRenderer() {
       })
 
       depotMarker.on('click', () => {
+        const safeDepotName = escapeHtml(depot.name || '起点中心仓')
         const infoContent = `
           <div style="padding: 10px 14px; font-size: 12px; line-height: 1.5; color: #1e293b; min-width: 200px; background: white; border-radius: 8px;">
             <div style="font-weight: 700; font-size: 14px; color: #0f172a; margin-bottom: 4px;">
-              🏬 ${depot.name || '起点中心仓'}
+              🏬 ${safeDepotName}
             </div>
             <div style="font-size: 11px; color: #64748b;">
               坐标: [${Number(depot.lng).toFixed(4)}, ${Number(depot.lat).toFixed(4)}]
@@ -275,8 +276,9 @@ export function useRouteMapRenderer() {
 
             const otherRoutesOptions = sameDayRoutes
               .map(({ or, oIdx }) => {
-                const oTitle = or.day && or.day_route_idx !== undefined ? `${or.day} 路线 ${or.day_route_idx + 1}` : `路线 ${oIdx + 1}`
-                return `<option value="${oIdx}" ${oIdx === rIdx ? 'disabled' : ''}>${oTitle} (${or.vehicle_name || or.truck_name || '货车'})</option>`
+                const oTitle = or.day && or.day_route_idx !== undefined ? `${escapeHtml(or.day)} 路线 ${or.day_route_idx + 1}` : `路线 ${oIdx + 1}`
+                const safeTruckName = escapeHtml(or.vehicle_name || or.truck_name || '货车')
+                return `<option value="${oIdx}" ${oIdx === rIdx ? 'disabled' : ''}>${oTitle} (${safeTruckName})</option>`
               })
               .join('')
 

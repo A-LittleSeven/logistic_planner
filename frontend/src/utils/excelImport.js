@@ -136,8 +136,8 @@ export function map2DArrayToStores(rows, options = {}) {
       avgLoads = Number(row[colMap.avg_loads])
     }
 
-    // 本埠 / 外埠 (1=本埠, 0=外埠，若未提供列则默认本埠 1)
-    let isHomepot = 1
+    // 本埠 / 外埠 (1=本埠, 0=外埠，若未提供列则默认外埠 0)
+    let isHomepot = 0
     if (colMap.is_homepot !== undefined) {
       const hVal = row[colMap.is_homepot]
       if (hVal !== null && hVal !== undefined && hVal !== '') {
@@ -238,10 +238,12 @@ export function map2DArrayToStores(rows, options = {}) {
       store_is_need_dist: true,
     }
 
-    // 保存所有原始属性用于通用透传
-    // 注意：跳过经纬度列，避免字符串原始值覆盖上面已归一化（含坐标系转换）的数值
+    // 保存未映射的额外原始属性用于通用透传
+    // 注意：跳过已映射的业务列与标准属性名，避免字符串原始值覆盖上面已归一化（含坐标系转换、数值/枚举清洗）的字段
+    const mappedColIndices = new Set(Object.values(colMap))
+    const reservedKeys = new Set(Object.keys(pt))
     rawHeaders.forEach((h, cIdx) => {
-      if (cIdx === colMap.lng || cIdx === colMap.lat) return
+      if (mappedColIndices.has(cIdx) || reservedKeys.has(h)) return
       if (h && row[cIdx] !== undefined && row[cIdx] !== null) {
         pt[h] = cleanStr(row[cIdx])
       }

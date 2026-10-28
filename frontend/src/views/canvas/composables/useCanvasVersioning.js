@@ -5,6 +5,7 @@ import { DAYS_LIST, getDistanceBetweenCoords } from '../../../utils/constants.js
 import { useRouteOptimizer } from '../../../composables/useRouteOptimizer.js'
 import { useRouteExport } from '../../../composables/useRouteExport.js'
 import { packDailyResultsPolylines, unpackDailyResultsPolylines } from '../../../utils/polylineCompressor.js'
+import { escapeHtml } from '../../../utils/mapMarkers.js'
 
 /**
  * 解包并规范化排班数据，避免 schedule_results 属性多层嵌套导致的结构损坏
@@ -46,6 +47,9 @@ export function useCanvasVersioning(state, options = {}) {
     clusteringK,
     minZoneSize,
     maxZoneSize,
+    defaultScheduleOptions,
+    scheduleOptions,
+    defaultRouteOptions,
     routeOptions,
     totalLoads,
     routes,
@@ -89,6 +93,21 @@ export function useCanvasVersioning(state, options = {}) {
       is_homepot: Number(s.is_homepot || 0),
       delivery_days_str: s.delivery_days_str || s.schedule_day || '',
     })).filter((s) => !isNaN(s.lng) && !isNaN(s.lat) && s.lng > 0 && s.lat > 0)
+
+    if (snapshot.algorithm_configs) {
+      if (snapshot.algorithm_configs.schedule_options && scheduleOptions) {
+        scheduleOptions.value = {
+          ...(defaultScheduleOptions || {}),
+          ...snapshot.algorithm_configs.schedule_options,
+        }
+      }
+      if (snapshot.algorithm_configs.route_options && routeOptions) {
+        routeOptions.value = {
+          ...(defaultRouteOptions || {}),
+          ...snapshot.algorithm_configs.route_options,
+        }
+      }
+    }
 
     if (snapshot.clustering_data && snapshot.clustering_data.clusters?.length) {
       clusteringResult.value = snapshot.clustering_data
@@ -295,6 +314,8 @@ export function useCanvasVersioning(state, options = {}) {
         algorithm_configs: {
           clustering_algorithm: clusteringAlgorithm.value,
           k: clusteringK.value,
+          schedule_options: scheduleOptions?.value ? { ...scheduleOptions.value } : undefined,
+          route_options: routeOptions?.value ? { ...routeOptions.value } : undefined,
         },
       }
 
@@ -356,15 +377,19 @@ export function useCanvasVersioning(state, options = {}) {
       const routesDiff = newRoutes - prevRoutes
       const distDiff = (newDist - prevDist).toFixed(1)
 
+      const safeVersionName = escapeHtml(targetVersion.version_name || '')
+      const safeChangeSummary = targetVersion.change_summary ? escapeHtml(targetVersion.change_summary) : ''
+
       ElNotification({
         title: `📋 已载入版本 V${targetVersion.version_number} - ${targetVersion.version_name}`,
         message: `
           <div style="font-size: 12px; line-height: 1.6; color: #334155;">
+            <div>• 版本名称: <strong>${safeVersionName}</strong></div>
             <div>• 规划阶段: <strong>${getStageLabel(canvas.stage)}</strong></div>
             <div>• 门店与运量: <strong>${newStores} 家</strong> (${storesDiff >= 0 ? '+' + storesDiff : storesDiff}) · <strong>${newLoads} 箱</strong> (${loadsDiff >= 0 ? '+' + loadsDiff : loadsDiff})</div>
             <div>• 店群数量: <strong>${newClusters} 个店群</strong></div>
             <div>• 规划路线: <strong>${newRoutes} 条</strong> (${routesDiff >= 0 ? '+' + routesDiff : routesDiff}) · <strong>${newDist} km</strong> (${distDiff >= 0 ? '+' + distDiff : distDiff} km)</div>
-            ${targetVersion.change_summary ? `<div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #cbd5e1; color: #64748b; font-style: italic;">"${targetVersion.change_summary}"</div>` : ''}
+            ${safeChangeSummary ? `<div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #cbd5e1; color: #64748b; font-style: italic;">"${safeChangeSummary}"</div>` : ''}
           </div>
         `,
         dangerouslyUseHTMLString: true,
